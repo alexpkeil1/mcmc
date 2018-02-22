@@ -19,22 +19,23 @@ y = dat$y
 #ols
 ols.coef = solve(t(Xs)%*%Xs)%*%t(Xs)%*%y
 #lasso
-lasso.coef = l1ce(y~., data=dat, bound=.5)$coef
+lasso.coef = l1ce(y~., data=dat, standardize = TRUE, bound=1)$coef
 
 
 
 
-mh.adaptive.diabetes <- function(iter, y, X=Xs, prop.sigma.start=1, inits=NULL) {
+mh.adaptive.guided.diabetes <- function(iter, y, X=Xs, prop.sigma.start=1, inits=NULL, guide=TRUE) {
   #adaptive metropolis hastings
   p = dim(X)[2]
   accept <- beta <- matrix(nrow=iter, ncol=p)
   if(is.null(inits)) inits = runif(p)*4-2
   beta[1,] = inits
   cov =  rep(prop.sigma.start, p)# starting value for covariance parameter of proposal distribution
-  ai = 50 # adapt every ai iterations
-  ari = 50 # base acceptance rate on this many iterations
+  ai = 30 # adapt every ai iterations
+  ari = 100 # base acceptance rate on this many iterations
   adapt.phase = Inf # stop adapting after this many iterations
   accept[1,] = rep(1,p)
+  pn = rep(1, p)
   scale = 1
   j = 2
   for(i in 2:iter){
@@ -49,18 +50,19 @@ mh.adaptive.diabetes <- function(iter, y, X=Xs, prop.sigma.start=1, inits=NULL) 
     for(q in 1:p){
      # update one at a time
      z = rep(0,p)
-     z[q] = rnorm(1,0, cov[q])
+     z[q] = abs(rnorm(1,0, cov[q]))
      # non-normalized log-probability at previous beta
      sigma = sd(y-X%*%b.cand)
-     llp = sum(dnorm(y, X%*%b.cand, sigma, log = TRUE)) + (q>1)*sum(dnorm(b.cand, log = TRUE)) # no prior on the intercept, standard normal otherwise
+     llp = sum(dnorm(y, X%*%b.cand, sigma, log = TRUE)) + sum(dnorm(b.cand, log = TRUE)) # no prior on the intercept, standard normal otherwise
      #include draw from proposal dist'n
-     b.cand = b.cand + z
+     b.cand = b.cand + pn*z
      # non-normalized log-probability at new beta
      sigma = sd(y-X%*%b.cand)
-     lp = sum(dnorm(y, X%*%b.cand, sigma, log = TRUE)) + (q>1)*sum(dnorm(b.cand, log = TRUE)) # no prior on the intercept, standard normal otherwise
+     lp = sum(dnorm(y, X%*%b.cand, sigma, log = TRUE)) + sum(dnorm(b.cand, log = TRUE)) # no prior on the intercept, standard normal otherwise
      l.rat = exp(lp-llp)
      a = rbinom(1, 1, min(1, l.rat))
-     if(!a) b.cand = b.cand - z
+     if(!a) b.cand = b.cand - pn*z
+     if(!a) pn = -pn
      accept[i,q] = a
     }# loop over p
     beta[i,] = b.cand
@@ -72,7 +74,7 @@ mh.adaptive.diabetes <- function(iter, y, X=Xs, prop.sigma.start=1, inits=NULL) 
 }
 
 
-post = mh.adaptive.diabetes(iter=30000, y=y, X=Xs, prop.sigma.start=0.001)
+post = mh.adaptive.guided.diabetes(iter=10000, y=y, X=Xs, prop.sigma.start=0.001)
 beta.post = post$beta
 apply(post$accept, 2, mean)
 
@@ -103,8 +105,29 @@ cor(beta.post[-(1:2000), 1:11])
 
 
 
-horse_shoe_gibbs <- function(){
-  TRUE
+horse_shoe_gibbs <- function(iter, X,y){
+  #
+  p = 1+dim(X)[2]
+  # containers
+  beta = matrix(nrow=iter,ncol=p)
+  sig2 <- numeric(iter)
+  lambda <- tau <-
+  # starting values
+  beta[,1] = runif()*4-2
+  sigma[1] = runif(1)*4
+  lambda[1] = runif(1)*4
+  
+  for(i in 2:iter){
+   #mu = X%*%beta[i,] 
+    
+   L = 
+    
+   for(b in p){
+     
+   }
+   
+    
+  }
 }
 
 

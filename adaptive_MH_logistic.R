@@ -42,14 +42,14 @@ mh.adaptive.logistic <- function(iter, y, X=Xs, chain=1, prop.sigma.start=1, ini
      z = rep(0,p)
      z[q] = rnorm(1,0, cov[q])
      # non-normalized log-probability at previous beta
-     dbinom(y,1,expit(X%*%b.cand), log = TRUE)
+     #dbinom(y,1,expit(X%*%b.cand), log = TRUE)
      llp = sum(dbinom(y,1,expit(X%*%b.cand), log = TRUE)) + # likelihood
-       (q>1)*sum(dnorm(b.cand, log = TRUE)) # prior: no prior on the intercept, standard normal otherwise
+       sum(dnorm(b.cand, log = TRUE)) # prior: no prior on the intercept, standard normal otherwise
      #include draw from proposal dist'n
      b.cand = b.cand + z
      # non-normalized log-probability at new beta
      lp = sum(dbinom(y,1,expit(X%*%b.cand), log = TRUE)) + # likelihood
-       (q>1)*sum(dnorm(b.cand, log = TRUE)) # prior: no prior on the intercept, standard normal otherwise
+       sum(dnorm(b.cand, log = TRUE)) # prior: no prior on the intercept, standard normal otherwise
      l.rat = exp(lp-llp)
      a = rbinom(1, 1, min(1, l.rat))
      if(!a) b.cand = b.cand - z
