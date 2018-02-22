@@ -53,12 +53,12 @@ mh.adaptive.guided.diabetes <- function(iter, y, X=Xs, prop.sigma.start=1, inits
      z[q] = abs(rnorm(1,0, cov[q]))
      # non-normalized log-probability at previous beta
      sigma = sd(y-X%*%b.cand)
-     llp = sum(dnorm(y, X%*%b.cand, sigma, log = TRUE)) + sum(dnorm(b.cand, log = TRUE)) # no prior on the intercept, standard normal otherwise
+     llp = sum(dnorm(y, X%*%b.cand, sigma, log = TRUE)) + sum(dnorm(b.cand, mean = 0, sd = 1, log = TRUE)) # standard normal priors
      #include draw from proposal dist'n
      b.cand = b.cand + pn*z
      # non-normalized log-probability at new beta
      sigma = sd(y-X%*%b.cand)
-     lp = sum(dnorm(y, X%*%b.cand, sigma, log = TRUE)) + sum(dnorm(b.cand, log = TRUE)) # no prior on the intercept, standard normal otherwise
+     lp = sum(dnorm(y, X%*%b.cand, sigma, log = TRUE)) + sum(dnorm(b.cand, mean = 0, sd = 1 log = TRUE)) # standard normal priors
      l.rat = exp(lp-llp)
      a = rbinom(1, 1, min(1, l.rat))
      if(!a) b.cand = b.cand - pn*z
