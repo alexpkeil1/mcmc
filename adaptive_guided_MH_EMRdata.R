@@ -1,4 +1,6 @@
 library(ggplot2)
+library(rjags)
+library(rstan)
 #leading to 3 exposed cases and 5 exposed controls
 # 36 leukemia cases and 198 controls
 
@@ -9,7 +11,7 @@ table(x,y)
 
 
 
-
+expit <- function(mu) 1/(1+exp(-mu))
 mh.adaptive.logistic <- function(iter, y, X=Xs, chain=1, prop.sigma.start=1, inits=NULL) {
   #adaptive metropolis hastings
   p = dim(X)[2]
@@ -17,9 +19,9 @@ mh.adaptive.logistic <- function(iter, y, X=Xs, chain=1, prop.sigma.start=1, ini
   if(is.null(inits)) inits = runif(p)*4-2
   beta[1,] = inits
   cov =  rep(prop.sigma.start, p)# starting value for covariance parameter of proposal distribution
-  ai = 10 # adapt every ai iterations; set to iter+1 to turn off adaptation
+  ai = 30 # adapt every ai iterations; set to iter+1 to turn off adaptation
   ari = 100 # base acceptance rate on this many iterations
-  adapt.phase = Inf # stop adapting after this many iterations
+  adapt.phase = 1000 # stop adapting after this many iterations
   accept[1,] = rep(1,p)
   scale = 1
   j = 2
@@ -62,12 +64,65 @@ mh.adaptive.logistic <- function(iter, y, X=Xs, chain=1, prop.sigma.start=1, ini
 }
 
 burn = 1000
-samples = mh.adaptive.logistic(iter=101000, y=y, X=cbind(rep(1,length(x)), x), chain=1, prop.sigma.start=1, inits=NULL)
+samples = mh.adaptive.logistic(iter=41000, y=y, X=cbind(rep(1,length(x)), x), chain=1, prop.sigma.start=1, inits=NULL)
 ests = samples$beta[samples$beta$iter>burn,]
 
 ggplot(data = data.frame(ests)) + geom_line(aes(x=iter, y=x)) + theme_classic()
 ggplot(data = data.frame(ests)) + geom_density(aes(x)) + theme_classic()
 
-apply(ests[,1:2], 2, function(x) c(median=median(x), mean=mean(x), sd=sd(x), or=exp(mean(x)), ll=exp(quantile(x, .025)), ll=exp(quantile(x, .975))))
+apply(ests[,1:2], 2, function(x) c(mean=mean(x), sd=sd(x),median=median(x),  or=exp(mean(x)), ll=exp(quantile(x, .025)), ll=exp(quantile(x, .975))))
 # standard logistic model
 summary(glm(y~x, family=binomial()))$coefficients
+
+
+#### doing in MCMC software
+# repeat in jags
+jagsmod <- '
+model{
+  mu = X%*%b
+ for(i in 1:N){
+  y[i] ~ dbern(1/(1+exp(-mu[i])))
+ } #N
+ # priors
+  b[1] ~ dnorm(0, 1/100)
+  b[2] ~ dnorm(0, 1/(0.5))
+} #model
+'
+tmpf2=tempfile()
+tmpf2 = '/Users/akeil/temp/_____jmod.txt'
+tmps=file(tmpf2,"w")
+cat(jagsmod,file=tmps)
+close(tmps)
+
+burn = 1000
+jags.data <- list(X = cbind(rep(1,length(x)), x),y=as.numeric(y),N=length(x))
+jags.check <- jags.model(file=tmpf2, data=jags.data, n.chains=4, n.adapt = 1000)
+update(jags.check, n.iter=burn)
+jags.fit <- coda.samples(jags.check, variable.names=c('b[1]', 'b[2]'), n.iter=10000)
+jags.sum <- summary(jags.fit)
+b.jags  <- jags.sum$statistics[c('b[1]', 'b[2]'),1]
+se.jags <- jags.sum$statistics[c('b[1]', 'b[2]'),2]
+summary(jags.fit)
+#traceplot(jags.fit)
+
+
+# repeat in stan
+stanmod <- '
+data{
+ int N;
+ int<lower=0,upper=1> y[N];
+ matrix[N,2] X;
+}
+parameters{
+ vector[2] b;
+}
+model{
+ b[1] ~ normal(0, 10);
+ b[2] ~ normal(0, sqrt(0.5));
+ y ~ bernoulli_logit(X*b);
+} 
+'
+stan.data <- list(X = cbind(rep(1,length(x)), x),y=as.numeric(y),N=length(x))
+stanmod.check <- stan(model_code = stanmod, data=stan.data, chains=1, iter=1, refresh=-1)
+stanmod.fit <- stan(fit = stanmod.check, data=stan.data, chains=4,warmup = 1000, iter=11000, refresh=-1)
+stanmod.fit
