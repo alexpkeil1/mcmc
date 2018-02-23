@@ -1,6 +1,8 @@
 library(ggplot2)
 library(rjags)
 library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
 #leading to 3 exposed cases and 5 exposed controls
 # 36 leukemia cases and 198 controls
 
@@ -9,10 +11,14 @@ x = c(rep(1, 3), rep(0, 33), rep(1, 5), rep(0, 193))
 
 table(x,y)
 
+# maximum likelihood
+summary(glm(y~x, family=binomial()))$coefficients
+
 
 
 expit <- function(mu) 1/(1+exp(-mu))
-mh.adaptive.logistic <- function(iter, y, X=Xs, chain=1, prop.sigma.start=1, inits=NULL) {
+mh.adaptive.guided.logistic <- function(iter, y, X=Xs, chain=1, prop.sigma.start=1, seed=NULL, inits=NULL, adaptive=FALSE, guided=FALSE) {
+  set.seed(seed)
   #adaptive metropolis hastings
   p = dim(X)[2]
   accept <- beta <- matrix(nrow=iter, ncol=p)
@@ -20,11 +26,13 @@ mh.adaptive.logistic <- function(iter, y, X=Xs, chain=1, prop.sigma.start=1, ini
   beta[1,] = inits
   cov =  rep(prop.sigma.start, p)# starting value for covariance parameter of proposal distribution
   ai = 30 # adapt every ai iterations; set to iter+1 to turn off adaptation
+  if(!adaptive) ai = iter+1
   ari = 100 # base acceptance rate on this many iterations
   adapt.phase = 1000 # stop adapting after this many iterations
   accept[1,] = rep(1,p)
   scale = 1
   j = 2
+  pn = rep(1, p) # direction of guiding
   for(i in 2:iter){
    #adaptive
     if((i%%ai)==0 & i>1 & i<=adapt.phase){
@@ -38,6 +46,7 @@ mh.adaptive.logistic <- function(iter, y, X=Xs, chain=1, prop.sigma.start=1, ini
      # update one at a time
      z = rep(0,p)
      z[q] = rnorm(1,0, cov[q])
+     if(guided) z = abs(z) * pn
      # non-normalized log-probability at previous beta
      #dbinom(y,1,expit(X%*%b.cand), log = TRUE)
      llp = sum(dbinom(y,1,expit(X%*%b.cand), log = TRUE)) + # log likelihood
@@ -51,31 +60,54 @@ mh.adaptive.logistic <- function(iter, y, X=Xs, chain=1, prop.sigma.start=1, ini
        (dnorm(b.cand[2], mean = 0, sd = sqrt(0.5), log = TRUE)) # 
      l.rat = exp(lp-llp)
      a = rbinom(1, 1, min(1, l.rat))
-     if(!a) b.cand = b.cand - z
+     if(!a){
+       b.cand = b.cand - z
+       pn[q] = -pn[q]
+     }
      accept[i,q] = a
     }# loop over p
     beta[i,] = b.cand
   } #loop over i
   bt = data.frame(beta)
-  names(bt) <- colnames(X)
+  names(bt) <- c('b[1]', 'b[2]')
   bt$iter = 1:dim(bt)[1]
   bt$chain = rep(chain, dim(bt)[1])
   list(beta = bt, accept=accept)
 }
 
+X = cbind(rep(1,length(x)), x) 
+
+# trace plots for different algorithms with same initial values, seed
+samples = mh.adaptive.guided.logistic(iter=200, y=y, X=X, chain=1, prop.sigma.start=0.1, seed=1232, inits=c(2, -2))
+samples.adapt = mh.adaptive.guided.logistic(iter=200, y=y, X=X, chain=1, prop.sigma.start=0.1, seed=1232, inits=c(2, -2), adaptive=TRUE)
+samples.guide = mh.adaptive.guided.logistic(iter=200, y=y, X=X, chain=1, prop.sigma.start=0.1, seed=1232, inits=c(2, -2), guided=TRUE)
+samples.guide.adapt = mh.adaptive.guided.logistic(iter=200, y=y, X=X, chain=1, prop.sigma.start=0.1, seed=1232, inits=c(2, -2), adaptive=TRUE, guided=TRUE)
+
+ggplot() + 
+  geom_line(aes(y=samples$beta['b[2]'],x=samples$beta$iter, color="Random walk")) +
+  geom_line(aes(y=samples.adapt$beta['b[2]'],x=samples.adapt$beta$iter, color="Adaptive")) +
+  geom_line(aes(y=samples.guide$beta['b[2]'],x=samples.guide$beta$iter, color="Guided")) +
+  geom_line(aes(y=samples.guide.adapt$beta['b[2]'],x=samples.guide.adapt$beta$iter, color="Guided, adaptive")) +
+  scale_y_continuous(name=expression(beta[2])) +
+  scale_x_continuous(name='Iteration') + 
+  scale_color_discrete(name='') + 
+  theme_classic() + theme(legend.position =  c(0,1), legend.justification = c(0,1))
+  
 burn = 1000
-samples = mh.adaptive.logistic(iter=41000, y=y, X=cbind(rep(1,length(x)), x), chain=1, prop.sigma.start=1, inits=NULL)
-ests = samples$beta[samples$beta$iter>burn,]
+samples = mh.adaptive.guided.logistic(iter=41000, y=y, X=X, chain=1, prop.sigma.start=0.1, seed=19238, inits=NULL, adaptive=TRUE, guided=TRUE)
+ests = samples$beta[samples$beta$iter>burn,'b[2]']
+#or, SE
+(beta.hat  <- mean(ests))
+(se  <- sd(ests))
+# normality based CI
+exp(beta.hat);exp(beta.hat+qnorm(.025)*se);exp(beta.hat+qnorm(.975)*se)
+#percentile based CI
+exp(quantile(ests, c(0.5, 0.025, 0.975)))
 
-ggplot(data = data.frame(ests)) + geom_line(aes(x=iter, y=x)) + theme_classic()
-ggplot(data = data.frame(ests)) + geom_density(aes(x)) + theme_classic()
-
-apply(ests[,1:2], 2, function(x) c(mean=mean(x), sd=sd(x),median=median(x),  or=exp(mean(x)), ll=exp(quantile(x, .025)), ll=exp(quantile(x, .975))))
-# standard logistic model
-summary(glm(y~x, family=binomial()))$coefficients
 
 
-#### doing in MCMC software
+
+#### doing in off-the-shelf MCMC software
 # repeat in jags
 jagsmod <- '
 model{
@@ -99,11 +131,16 @@ jags.data <- list(X = cbind(rep(1,length(x)), x),y=as.numeric(y),N=length(x))
 jags.check <- jags.model(file=tmpf2, data=jags.data, n.chains=4, n.adapt = 1000)
 update(jags.check, n.iter=burn)
 jags.fit <- coda.samples(jags.check, variable.names=c('b[1]', 'b[2]'), n.iter=10000)
-jags.sum <- summary(jags.fit)
-b.jags  <- jags.sum$statistics[c('b[1]', 'b[2]'),1]
-se.jags <- jags.sum$statistics[c('b[1]', 'b[2]'),2]
-summary(jags.fit)
-#traceplot(jags.fit)
+
+#or, SE
+(beta.hat  <- jags.sum$statistics[c('b[2]'),1])
+(se  <- jags.sum$statistics[c('b[2]'),2])
+# normality based CI
+exp(beta.hat);exp(beta.hat+qnorm(.025)*se);exp(beta.hat+qnorm(.975)*se)
+#percentile based CI
+exp(jags.sum$quantiles[2,c(3,1,5)])
+
+
 
 
 # repeat in stan
@@ -124,5 +161,13 @@ model{
 '
 stan.data <- list(X = cbind(rep(1,length(x)), x),y=as.numeric(y),N=length(x))
 stanmod.check <- stan(model_code = stanmod, data=stan.data, chains=1, iter=1, refresh=-1)
-stanmod.fit <- stan(fit = stanmod.check, data=stan.data, chains=4,warmup = 1000, iter=11000, refresh=-1)
-stanmod.fit
+stanmod.fit <- stan(fit = stanmod.check, data=stan.data, chains=4,warmup = 1000, iter=101000, refresh=-1)
+print(stanmod.fit, digits_summary = 4)
+
+#or, SE
+(beta.hat <- summary(stanmod.fit)$summary[2,1])
+(se <- summary(stanmod.fit)$summary[2,3])
+# normality based CI
+exp(beta.hat);exp(beta.hat+qnorm(.025)*se);exp(beta.hat+qnorm(.975)*se)
+#percentile based CI
+exp(summary(stanmod.fit)$summary[2,c(6,4,8)])
