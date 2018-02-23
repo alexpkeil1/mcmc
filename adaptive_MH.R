@@ -87,7 +87,7 @@ mh.adaptive.guided <- function(iter, prop.sigma.start=1,seed=NULL){
   # adapdation parameters
   d = 1 # number of parameters in posterior
   cov = prop.sigma.start # starting value for covariance parameter of proposal distribution
-  ai = 30 # adapt every ai iterations
+  ai = 1 # adapt every ai iterations
   ari = 100 # base acceptance rate on this many iterations
   adapt.phase = Inf # stop adapting after this many iterations
   #####
@@ -121,7 +121,7 @@ mh.adaptive.guided <- function(iter, prop.sigma.start=1,seed=NULL){
 }
 
 
-mc.iter = 10000
+mc.iter = 50000
 prop.sigma = 0.1
 burnin = 1000
 if(burnin>0){
@@ -140,7 +140,6 @@ autocorr(as.mcmc(samples.adapt$x))
 autocorr(as.mcmc(samples.guided$x))
 
 
-samples.adapt$prop.cov
 # convergence dx
 # Z-scores for a test of equality of means between the first and last parts of the chain
 geweke.diag(as.mcmc(samples$x))

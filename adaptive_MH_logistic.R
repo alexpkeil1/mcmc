@@ -23,7 +23,7 @@ mh.adaptive.logistic <- function(iter, y, X=Xs, chain=1, prop.sigma.start=1, ini
   beta[1,] = inits
   cov =  rep(prop.sigma.start, p)# starting value for covariance parameter of proposal distribution
   ai = 10 # adapt every ai iterations; set to iter+1 to turn off adaptation
-  ari = 50 # base acceptance rate on this many iterations
+  ari = 100 # base acceptance rate on this many iterations
   adapt.phase = Inf # stop adapting after this many iterations
   accept[1,] = rep(1,p)
   scale = 1

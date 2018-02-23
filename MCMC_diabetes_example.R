@@ -10,6 +10,15 @@ names(dat) <- tolower(names(dat))
 head(dat)
 summary(dat)
 
+dat$y = dat$y-mean(dat$y)
+xidx = c(which(names(dat)=="y"))
+dat[,-xidx] = 
+  scale(dat[,-xidx], 2, STATS=mean, FUN='-')
+
+/apply(dat[,-xidx], 2, sd)
+summary(dat)
+
+
 # least squares
 X = as.matrix(subset(dat, select = names(dat)[1:10]))
 #Xs = cbind(int=rep(1, dim(dat)[1]), (X-apply(X, 2, mean))/apply(X, 2, sd))
