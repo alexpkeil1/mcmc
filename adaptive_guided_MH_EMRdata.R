@@ -2,6 +2,7 @@ library(ggplot2)
 library(rjags)
 library(rstan)
 library(grid)
+library(ggExtra)
 
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
@@ -53,7 +54,7 @@ rd; rd-1.96*se.rd; rd+1.96*se.rd;
 
 
 expit <- function(mu) 1/(1+exp(-mu))
-mh.adaptive.guided.logistic <- function(iter, y, X=X, chain=1, prop.sigma.start=1, seed=NULL, inits=NULL, adaptive=FALSE, guided=FALSE) {
+mh.adaptive.guided.logistic <- function(iter, y, X=X, pm=c(0,0), pv=c(100,0.5), chain=1, prop.sigma.start=1, seed=NULL, inits=NULL, adaptive=FALSE, guided=FALSE, incl.priors=TRUE, incl.likelihood=TRUE) {
   set.seed(seed)
   #adaptive metropolis hastings
   X1 = X0 = X
@@ -89,15 +90,15 @@ mh.adaptive.guided.logistic <- function(iter, y, X=X, chain=1, prop.sigma.start=
      if(guided) z = abs(z) * pn
      # non-normalized log-probability at previous beta
      #dbinom(y,1,expit(X%*%b.cand), log = TRUE)
-     llp = sum(dbinom(y,1,expit(X%*%b.cand), log = TRUE)) + # log likelihood
-       0*(dnorm(b.cand[1], mean = 0, sd = 10, log = TRUE)) + # 
-       0*(dnorm(b.cand[2], mean = 0, sd = sqrt(0.5), log = TRUE)) # 
+     llp = ifelse(incl.likelihood,sum(dbinom(y,1,expit(X%*%b.cand), log = TRUE)), 0) + # log likelihood
+            ifelse(incl.priors, (dnorm(b.cand[1], mean = pm[1], sd = sqrt(pv[1]), log = TRUE) + # 
+                     dnorm(b.cand[2], mean = pm[2], sd = sqrt(pv[2]), log = TRUE)), 0) # 
      #include draw from proposal dist'n
      b.cand = b.cand + z
      # non-normalized log-probability at new beta
-     lp = sum(dbinom(y,1,expit(X%*%b.cand), log = TRUE)) + # log likelihood
-       0*(dnorm(b.cand[1], mean = 0, sd = 10, log = TRUE)) + # 
-       0*(dnorm(b.cand[2], mean = 0, sd = sqrt(0.5), log = TRUE)) # 
+     lp = ifelse(incl.likelihood,sum(dbinom(y,1,expit(X%*%b.cand), log = TRUE)), 0) + # log likelihood
+            ifelse(incl.priors, (dnorm(b.cand[1], mean = pm[1], sd = sqrt(pv[1]), log = TRUE) + # 
+                     dnorm(b.cand[2], mean = pm[2], sd = sqrt(pv[2]), log = TRUE)), 0) # 
      l.rat = exp(lp-llp)
      a = rbinom(1, 1, min(1, l.rat))
      if(!a){
@@ -118,62 +119,169 @@ mh.adaptive.guided.logistic <- function(iter, y, X=X, chain=1, prop.sigma.start=
   bt$chain = rep(chain, dim(bt)[1])
   bt$rd = rd
   bt$rd1000 = rd*10000
-  list(beta = bt, accept=accept)
+  list(beta = bt, accept=accept, cov=cov)
 }
 
 X = cbind(rep(1,length(x)), x) 
 
 # trace plots for different algorithms with same initial values, seed
-iter=4000
+iter=10000
 samples = mh.adaptive.guided.logistic(iter=iter, y=y, X=X, chain=1, prop.sigma.start=0.1, seed=32217, inits=c(2, -3))
 samples.adapt = mh.adaptive.guided.logistic(iter=iter, y=y, X=X, chain=1, prop.sigma.start=0.1, seed=32217, inits=c(2, -3), adaptive=TRUE)
 samples.guide = mh.adaptive.guided.logistic(iter=iter, y=y, X=X, chain=1, prop.sigma.start=0.1, seed=32217, inits=c(2, -3), guided=TRUE)
 samples.guide.adapt = mh.adaptive.guided.logistic(iter=iter, y=y, X=X, chain=1, prop.sigma.start=0.1, seed=32217, inits=c(2, -3), adaptive=TRUE, guided=TRUE)
 
 
+
+# fig 1 (prior, no data; likelihood, no prior;  both)
+set.seed(32217)
+rngburn = sample(1000:10000, 250)
+priors = mh.adaptive.guided.logistic(iter=max(rngburn), y=y, X=X, chain=1, prop.sigma.start=.1, seed=32217, inits=c(2, -3), adaptive=TRUE, guided=TRUE, incl.priors=TRUE, incl.likelihood=FALSE)
+priors2 = mh.adaptive.guided.logistic(iter=max(rngburn), y=y, X=X, pm=c(0,1.5), pv=c(2,0.25), chain=1, prop.sigma.start=.1, seed=32217, inits=c(2, -3), adaptive=TRUE, guided=TRUE, incl.priors=TRUE, incl.likelihood=FALSE)
+likelihood = mh.adaptive.guided.logistic(iter=max(rngburn), y=y, X=X, chain=1, prop.sigma.start=.1, seed=32217, inits=c(2, -3), adaptive=TRUE, guided=TRUE, incl.priors=FALSE, incl.likelihood=TRUE)
+posterior = mh.adaptive.guided.logistic(iter=max(rngburn), y=y, X=X, chain=1, prop.sigma.start=.1, seed=32217, inits=c(2, -3), adaptive=TRUE, guided=TRUE, incl.priors=TRUE, incl.likelihood=TRUE)
+posterior2 = mh.adaptive.guided.logistic(iter=max(rngburn), y=y, X=X, pm=c(0,1.5), pv=c(2,0.25), chain=1, prop.sigma.start=.1, seed=32217, inits=c(2, -3), adaptive=TRUE, guided=TRUE, incl.priors=TRUE, incl.likelihood=TRUE)
+
+panel11 <- ggplot() + 
+  geom_point(aes(x=priors$beta[rngburn,'b[2]'],y=priors$beta[rngburn,'b[1]']), alpha=0.15) +
+  scale_x_continuous(name=expression(beta[2])) +
+  scale_y_continuous(name=expression(beta[1])) + 
+  theme_classic() + 
+  coord_cartesian(xlim=c(-3,4),ylim=c(-4, -.1))
+panel.blank <- ggplot() + geom_point(aes(x=-100,y=-100))+
+  scale_x_continuous(name=expression(beta[2])) +
+  scale_y_continuous(name=expression(beta[1])) + 
+  theme_classic() + 
+  coord_cartesian(xlim=c(-3,4),ylim=c(-4, -.1))
+panel22 <- ggplot() + 
+  geom_point(aes(x=likelihood$beta[rngburn,'b[2]'],y=likelihood$beta[rngburn,'b[1]']), alpha=0.15) +
+  scale_x_continuous(name=expression(beta[2])) +
+  scale_y_continuous(name=expression(beta[1])) + 
+  theme_classic() + 
+  coord_cartesian(xlim=c(-3,4),ylim=c(-4, -.1))
+panel33 <- ggplot() + 
+  geom_point(aes(x=posterior$beta[rngburn,'b[2]'],y=posterior$beta[rngburn,'b[1]']), alpha=0.15) +
+  scale_x_continuous(name=expression(beta[2])) +
+  scale_y_continuous(name=expression(beta[1])) + 
+  theme_classic() + 
+  coord_cartesian(xlim=c(-3,4),ylim=c(-4, -.1))
+panel41 <- ggplot() + 
+  geom_point(aes(x=priors2$beta[rngburn,'b[2]'],y=priors2$beta[rngburn,'b[1]']), alpha=0.15) +
+  scale_x_continuous(name=expression(beta[2])) +
+  scale_y_continuous(name=expression(beta[1])) + 
+  theme_classic() + 
+  coord_cartesian(xlim=c(-3,4),ylim=c(-4, -.1))
+panel43 <- ggplot() + 
+  geom_point(aes(x=posterior2$beta[rngburn,'b[2]'],y=posterior2$beta[rngburn,'b[1]']), alpha=0.15) +
+  scale_x_continuous(name=expression(beta[2])) +
+  scale_y_continuous(name=expression(beta[1])) + 
+  theme_classic() + 
+  coord_cartesian(xlim=c(-3,4),ylim=c(-4, -.1))
+#panel11 <- ggMarginal(panel11, type = "histogram")
+#panel22 <- ggMarginal(panel22, type = "histogram")
+#panel33 <- ggMarginal(panel33, type = "histogram")
+#panel41 <- ggMarginal(panel41, type = "histogram")
+#panel43 <- ggMarginal(panel43, type = "histogram")
+
+
+vp0a <- viewport(width=0.33, height=.25, x=0.00, y=1.00, just=c("left", "top"))
+vp1a <- viewport(width=0.33, height=.25, x=0.33, y=1.00, just=c("left", "top"))
+vp2a <- viewport(width=0.33, height=.25, x=0.66, y=1.00, just=c("left", "top"))
+vp0b <- viewport(width=0.33, height=.25, x=0.00, y=0.75, just=c("left", "top"))
+vp1b <- viewport(width=0.33, height=.25, x=0.33, y=0.75, just=c("left", "top"))
+vp2b <- viewport(width=0.33, height=.25, x=0.66, y=0.75, just=c("left", "top"))
+vp0c <- viewport(width=0.33, height=.25, x=0.00, y=0.50, just=c("left", "top"))
+vp1c <- viewport(width=0.33, height=.25, x=0.33, y=0.50, just=c("left", "top"))
+vp2c <- viewport(width=0.33, height=.25, x=0.66, y=0.50, just=c("left", "top"))
+vp0d <- viewport(width=0.33, height=.25, x=0.00, y=0.25, just=c("left", "top"))
+vp1d <- viewport(width=0.33, height=.25, x=0.33, y=0.25, just=c("left", "top"))
+vp2d <- viewport(width=0.33, height=.25, x=0.66, y=0.25, just=c("left", "top"))
+
+pdf("~/Desktop/fig1.pdf", width=6, height=7)
+#quartz()
+ print(panel11, vp=vp0a)
+ print(panel.blank, vp=vp1a)
+ print(panel.blank, vp=vp2a)
+ print(panel.blank, vp=vp0b)
+ print(panel22, vp=vp1b)
+ print(panel.blank, vp=vp2b)
+ print(panel11, vp=vp0c)
+ print(panel22, vp=vp1c)
+ print(panel33, vp=vp2c)
+ print(panel41, vp=vp0d)
+ print(panel22, vp=vp1d)
+ print(panel43, vp=vp2d)
+dev.off()
+
+
+
+
+
+
+rng0 = 1:10000
 rng1 = 1:100
-rng2 = 3900:4000
+rng2 = 9900:10000
+p0 = 
+  ggplot() + 
+  geom_hline(aes(yintercept=c(.527-1.96*.546,.527+1.96*.546)), color='black', linetype=3) +
+  geom_line(aes(y=samples.guide.adapt$beta[rng0,'b[2]'],x=rng0, color='d')) +
+  geom_line(aes(y=samples.guide$beta[rng0,'b[2]'],x=rng0, color='c')) +
+  geom_line(aes(y=samples$beta[rng0,'b[2]'],x=rng0, color='a')) +
+  scale_y_continuous(name=expression(beta[2])) +
+  scale_x_continuous(name='Iteration') + 
+  scale_color_grey(name='',labels=c("Random walk", "Guided",  "Guided, adaptive")) + 
+  theme_classic() + theme(legend.position =  c(1,.01), legend.justification = c(1,0), legend.background = element_blank()) +
+  coord_cartesian(ylim=c(-3,2))
+
 p1 = 
   ggplot() + 
   geom_hline(aes(yintercept=c(.527-1.96*.546,.527+1.96*.546)), color='black', linetype=3) +
-  geom_line(aes(y=samples$beta[rng1,'b[2]'],x=rng1, color='a')) +
-  geom_line(aes(y=samples.guide$beta[rng1,'b[2]'],x=rng1, color='c')) +
   geom_line(aes(y=samples.guide.adapt$beta[rng1,'b[2]'],x=rng1, color='d')) +
-  scale_y_continuous(name=expression(beta[2])) +
-  scale_x_continuous(name='Iteration') + 
-  scale_color_grey(name='',labels=c("Random walk", "Guided", "Guided, adaptive"), guide=FALSE) + 
-  theme_classic() + theme(legend.position =  c(1,.01), legend.justification = c(1,0), legend.background = element_blank()) +
+  geom_line(aes(y=samples.guide$beta[rng1,'b[2]'],x=rng1, color='c')) +
+  geom_line(aes(y=samples$beta[rng1,'b[2]'],x=rng1, color='a')) +
+  scale_y_continuous(name='') +
+  scale_x_continuous(name='', breaks=c(0,100)) + 
+  scale_color_grey(name='',labels=c("Random walk" "Guided",  "Guided, adaptive"), guide=FALSE) + 
+  theme_classic() + theme(axis.title.y = element_blank(), axis.line.y = element_blank(), axis.text.y = element_blank(), axis.ticks.y = element_blank()) +
+  theme(legend.position =  c(1,.01), legend.justification = c(1,0), legend.background = element_blank()) +
   coord_cartesian(ylim=c(-3,2))
 
 p2 = ggplot() + 
   geom_hline(aes(yintercept=c(.527-1.96*.546,.527+1.96*.546)), color='black', linetype=3) +
-  geom_line(aes(y=samples$beta[rng2,'b[2]'],x=rng2, color='a')) +
-  geom_line(aes(y=samples.guide$beta[rng2,'b[2]'],x=rng2, color='c')) +
   geom_line(aes(y=samples.guide.adapt$beta[rng2,'b[2]'],x=rng2, color='d')) +
+  geom_line(aes(y=samples.guide$beta[rng2,'b[2]'],x=rng2, color='c')) +
+  geom_line(aes(y=samples$beta[rng2,'b[2]'],x=rng2, color='a')) +
   scale_y_continuous(name='') +
-  scale_x_continuous(name=' ') + 
-  scale_color_grey(name='',labels=c("Random walk", "Guided", "Guided, adaptive")) + 
+  scale_x_continuous(name=' ', breaks=c(9900,10000)) + 
+  scale_color_grey(name='',labels=c("Random walk", "Guided",  "Guided, adaptive"), guide=FALSE) + 
   theme_classic() + theme(axis.title.y = element_blank(), axis.line.y = element_blank(), axis.text.y = element_blank(), axis.ticks.y = element_blank()) +
   theme(legend.position =  c(1,.01), legend.justification = c(1,0), legend.background = element_blank()) +
   coord_cartesian(ylim=c(-3,2))
 
 # unused trace of risk difference
 p3 = ggplot() + 
+  geom_line(aes(y=samples.guide.adapt$beta$rd,x=samples.guide.adapt$beta$iter, color='d')) +
   geom_line(aes(y=samples$beta$rd,x=samples$beta$iter, color='a')) +
   geom_line(aes(y=samples.guide$beta$rd,x=samples.guide$beta$iter, color='c')) +
-  geom_line(aes(y=samples.guide.adapt$beta$rd,x=samples.guide.adapt$beta$iter, color='d')) +
   scale_y_continuous(name='') +
   scale_x_continuous(name=' ') + 
-  scale_color_grey(name='',labels=c("Random walk", "Guided", "Guided, adaptive")) + 
+  scale_color_grey(name='',labels=c("Random walk", "Guided",  "Guided, adaptive")) + 
   theme_classic() + theme(axis.title.y = element_blank(), axis.line.y = element_blank(), axis.text.y = element_blank(), axis.ticks.y = element_blank()) +
-  theme(legend.position =  c(1,.01), legend.justification = c(1,0), legend.background = element_blank())
+  theme(legend.position =  c(1,.01), legend.justification = c(1,0), legend.background = element_blank())+
+  coord_cartesian(ylim=c(-3,2))
 
-vp1 <- viewport(width=0.5, height=1, x=0, y=1, just=c("left", "top"))
-vp2 <- viewport(width=0.45, height=1, x=0.5, y=1, just=c("left", "top"))
-pdf("~/Desktop/fig2.pdf", width=4, height=3.5)
+vp0 <- viewport(width=0.5, height=1, x=0, y=1, just=c("left", "top"))
+vp1 <- viewport(width=0.25, height=1, x=.5, y=1, just=c("left", "top"))
+vp2 <- viewport(width=0.2, height=1, x=0.75, y=1, just=c("left", "top"))
+pdf("~/Desktop/fig2.pdf", width=7, height=3.5)
+ print(p0, vp=vp0)
  print(p1, vp=vp1)
  print(p2, vp=vp2)
 dev.off()
+
+
+
+
 
   
 burn = 1000
