@@ -167,7 +167,7 @@ probdist.summary <- function(posterior.samples){
 }
 
 # total samples after burnin
-M = 100000
+M = 200000
 # burnin/adaptation length
 B = 1000
 
@@ -198,8 +198,3 @@ probdist.summary(samples.guided.bayes)
 probdist.summary(samples.adaptive.bayes)
 probdist.summary(samples.guided.adaptive.bayes)
 
-b2samples = (rnorm(100))
-
-Rprof("/Users/akeil/temp/prof.txt")
- system.time(metrop.hastings(iter=100000, burnin=1000, y=y, X=X, chain=1, prop.sigma.start=0.1, seed=19238, inits=NULL, adaptive=FALSE, guided=FALSE, incl.priors=TRUE, incl.likelihood=TRUE))
-Rprof(NULL)
