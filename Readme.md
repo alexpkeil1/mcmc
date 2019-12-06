@@ -7,8 +7,14 @@
     data("magfields", package="metropolis")
     # see lots of examples here
     vignette("metropolis-vignette", package="metropolis")
-## Example: fitting a logistic regression model with uniform priors under two different Metropolis algorithms
+    table(magfields)
+    >          x
+    > y      0   1
+    >    0 193   5
+    >    1  33   3
 
+## Example: fitting a logistic regression model with uniform priors under two different Metropolis algorithms
+  
 ### Random walk Metropolis
     res.rw = metropolis_glm(y ~ x, data=magfields, family=binomial(), iter=20000, 
                         burnin=3000, adapt=FALSE, guided=FALSE, block=TRUE, inits=c(2,-3), 
