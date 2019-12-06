@@ -25,7 +25,7 @@ The following vignette contains code to accompany the paper "Markov unchained: a
     - Guided, adaptive metropolis
     - Guided, adaptive metropolis with normal priors
 - Using the "metropolis" r package to carry out the same analysis to simulate a posterior distribution for a logistic model under uniform or normal priors
-- *Note* each algorith used here only runs for 10,000 iterations (to save computational time when installing package). The results will vary more than they would with the larger number of iterations used in the paper.
+- *Note* each algorithm used here only runs for 10,000 iterations (to save computational time when installing package). The results will vary more than they would with the larger number of iterations used in the paper.
 
 ## The data
 A case control study of leukemia (y=1) and residence around strong magnetic fields (x=1)
