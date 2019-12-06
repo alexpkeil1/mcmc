@@ -386,7 +386,8 @@ summary(res.ga, keepburn = FALSE)
 plot(res.ga, par = 1:2, keepburn=TRUE)
 
 ```
-## Using the R package
+
+## Using the R package, smart initial values
 Finally, we can use the "glm" option in initial values to initialize the chain with the MLE estimates.
 This can eke out slightly more efficiency and allow reduced burnin.
 
@@ -422,6 +423,8 @@ par(mfcol=c(2,1))
  plot(rd.ga.init, type='l', xlab = "RD*1000", ylab="Iteration", ylim=c(-.2, 2.5))
 par(mfcol=c(1,1))
 
+# posterior mean, median, credible intervals
+mean(rd.ga.init[-c(1:1000)])
 quantile(rd.ga.init[-c(1:1000)], p = c(.5, .025, .975) )
 
 ```
