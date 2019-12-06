@@ -7,7 +7,8 @@
 metropolis_glm(f, data, family = binomial(), iter = 100,
   burnin = round(iter/2), pm = NULL, pv = NULL, chain = 1,
   prop.sigma.start = 0.1, inits = NULL, adaptive = TRUE,
-  guided = FALSE, block = TRUE, control = metropolis.control())
+  guided = FALSE, block = TRUE, saveproposal = FALSE,
+  control = metropolis.control())
 }
 \arguments{
 \item{f}{an R style formula (e.g. y ~ x1 + x2)}
@@ -41,6 +42,8 @@ regression coefficients (set to NULL to use uniform priors)}
 random variables in the model, including intercept, then block=c(1,3) will update the 
 intercept separately from the other three parameters.) If TRUE, then updates each parameter 
 1 by 1. Using "guide=TRUE" with blocking=<vector> is not advised}
+
+\item{saveproposal}{(logical, default=FALSE) save the rejected proposals (block=TRUE only)?}
 
 \item{control}{parameters that control fitting algorithm. See metropolis.control()}
 }

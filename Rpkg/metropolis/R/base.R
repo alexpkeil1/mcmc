@@ -208,6 +208,7 @@ metropolis_glm <- function(
                        adaptive=TRUE, 
                        guided=FALSE, 
                        block=TRUE,
+                       saveproposal=FALSE,
                        control = metropolis.control()
                        ) {
   #' @title Use the Metropolis Hastings algorithm to estimate Bayesian glm parameters
@@ -233,6 +234,7 @@ metropolis_glm <- function(
   #' random variables in the model, including intercept, then block=c(1,3) will update the 
   #' intercept separately from the other three parameters.) If TRUE, then updates each parameter 
   #' 1 by 1. Using "guide=TRUE" with blocking=<vector> is not advised
+  #' @param saveproposal (logical, default=FALSE) save the rejected proposals (block=TRUE only)?
   #' @param control parameters that control fitting algorithm. See metropolis.control()
   #' @import stats
   #' @export
@@ -247,7 +249,6 @@ metropolis_glm <- function(
   #' iter=10000, burnin=3000, adapt=TRUE, guide=TRUE, block=FALSE)
   #' apply(res$parms, 2, mean)
   #' glm(y ~ x1 + x2+ factor(x3), family=gaussian(), data=dat)
-  debug=FALSE
   # error catching 
   if (is.character(family)) 
     family <- get(family, mode = "function", envir = parent.frame())
@@ -267,19 +268,18 @@ metropolis_glm <- function(
   
   # collect some info on data
     X = model.matrix(f, data = data)
-    if(debug) print(dim(X))
     mterm = terms(f)
     outcol = as.character(attr(mterm, "variables")[[2]])
     y = data[,outcol]
     
     p = dim(X)[2] # number of parameters
     if(family$family == "gaussian"){
-      #if(debug) cat("Gaussian model\n")
       p = p+1 # scale parameter
     }
 
     # create empty matrixes/vectors for posterior estimates
     accept <- parms <- matrix(nrow=iter+burnin, ncol=p)
+    proposals = NULL
   # generate initial values
     if(is.null(inits)){
       inits = c(beta=runif(p)*4-2)
@@ -289,14 +289,14 @@ metropolis_glm <- function(
       inits = as.numeric(mlefit$coefficients)
       if(family$family == "gaussian") inits = c(logscale=log(sd(mlefit$residuals)), beta=inits)
     }
-    parms[1,] = inits
+    parms[1,] <- inits
+    if(saveproposal & length(block)==1 && block) proposals = parms
     if(length(control$prop.sigma.start)==1){
       cov = rep(control$prop.sigma.start, p)
     }else{
       cov = control$prop.sigma.start
     }
 
-    if(debug) cat(c(dim(X), dim(parms)))
     accept[1,] = rep(1, p)
     if(!adaptive) control$adapt.start = iter+1+burnin
     # guiding direction
@@ -311,7 +311,6 @@ metropolis_glm <- function(
     }
     b.prv = parms[i-1,]
     b.cand = b.prv
-    if(debug) print(b.prv)
     if(length(block)==1 && block){
       # block update all parameters
       # non-normalized log-probability at previous beta
@@ -320,13 +319,12 @@ metropolis_glm <- function(
       z = rnorm(p,0, cov) 
       if(guided) z = abs(z) * dir
       b.cand = b.cand + z
+      if(saveproposal) proposals[i,] = b.cand
+      
       # non-normalized log-probability at candidate beta
       lp = calcpost(y,X,b.cand,family, pm, pv)        
       # accept/reject candidate value
       accept.prob = exp(lp-llp) # acceptance probability
-      if(debug) print(llp)
-      if(debug) print(lp)
-      if(debug) print(accept.prob)
       a = (accept.prob > runif(1))
       if(is.nan(a)) stop("Acceptance probability is NaN, indicating a problem with the chain. 
                            If using adapt=TRUE, try changing some of the adaptation parameters 
@@ -357,7 +355,6 @@ metropolis_glm <- function(
         lp = calcpost(y,X,b.cand,family, pm, pv)        
         # accept/reject candidate value
         accept.prob = exp(lp-llp) # acceptance probability
-        if(debug) print(accept.prob)
         a = (accept.prob > runif(1))
         if(is.nan(a)) stop("Acceptance probability is NaN, indicating a problem with the chain. 
                            If using adapt=TRUE, try changing some of the adaptation parameters 
@@ -391,8 +388,31 @@ metropolis_glm <- function(
              guided=guided,
              adaptive = adaptive,
              priors = ifelse(is.null(pm), "uniform", "normal"),
-             inits = inits
+             inits = inits,
+             proposals = proposals
              )
   class(res) <- "metropolis.samples"
   res
+}
+
+
+# coda object
+as.mcmc.metropolis.samples <- function(object, ...){
+  #' @title Convert glm_metropolis output to `mcmc` object from package coda
+  #'
+  #' @description Allows use of useful functions from `coda` package
+  #' @details TBA
+  #' @param object an object from the function "metropolis"
+  #' @param ... not used
+  #' @importFrom coda mcmc
+  #' @importFrom coda as.mcmc
+  #' @export
+  #' @examples
+  #' runif(1)
+  samples = object$parms[object$parms$burn==0,grep('logsigma|b_', names(object$parms), value = TRUE, fixed=FALSE)]
+  mcmc(data= samples, 
+       start =  object$burnin, 
+       end = object$iter,
+       thin = 1)
+  
 }
