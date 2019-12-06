@@ -345,12 +345,20 @@ points(init2[1], init2[2], col="red", pch=19)
 points(postmean2[1], postmean2[2], col="orange", pch=19)
 legend("topright", col=c("red", "orange"), legend=c("Initial value", "Post. mean"), pch=19)
 
-par(mfcol=c(1,1))
+par(mfcol=c(1,2))
+plot(beta_post_adaptguide[,2], type='l',  ylab=expression(beta[1]), xlab="Iteration", ylim=c(-4, 4))
 plot(beta_post_adaptguide2[,2], type='l',  ylab=expression(beta[1]), xlab="Iteration", ylim=c(-4, 4))
-plot(rd, type='l',  ylab="RD*1000", xlab="Iteration", ylim=c(-4, 4))
 
-plot(density(beta_post_adaptguide2[-c(1:1000),2]), xlab=expression(beta[1]), ylab="Density", main="")
-plot(density(rd[-c(1:1000)]), xlab="RD*1000", ylab="Density", main="")
+plot(density(beta_post_adaptguide[-c(1:1000),2]), xlab=expression(beta[1]), ylab="Density", main="", xlim=c(-4, 4))
+plot(density(beta_post_adaptguide2[-c(1:1000), 2]), xlab=expression(beta[1]), ylab="Density", main="", xlim=c(-4, 4))
+par(mfcol=c(1,1))
+
+plot(rd_adaptguide, type='l',  ylab="RD*1000", xlab="Iteration", ylim=c(-.2, .5))
+plot(rd_adaptguide2, type='l',  ylab="RD*1000", xlab="Iteration", ylim=c(-.2, .5))
+
+plot(density(rd_adaptguide[-c(1:1000)]), xlab=expression(beta[1]), ylab="Density", main="", xlim=c(-.2, .5))
+plot(density(rd_adaptguide2[-c(1:1000)]), xlab="RD*1000", ylab="Density", main="", xlim=c(-.2, .5))
+par(mfcol=c(1,1))
 ```
 
 
