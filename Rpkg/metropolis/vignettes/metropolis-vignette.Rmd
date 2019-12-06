@@ -351,7 +351,7 @@ plot(beta_post_adaptguide2[,2], type='l',  ylab=expression(beta[1]), xlab="Itera
 
 plot(density(beta_post_adaptguide[-c(1:1000),2]), xlab=expression(beta[1]), ylab="Density", main="", xlim=c(-4, 4))
 plot(density(beta_post_adaptguide2[-c(1:1000), 2]), xlab=expression(beta[1]), ylab="Density", main="", xlim=c(-4, 4))
-par(mfcol=c(1,1))
+par(mfcol=c(2,1))
 
 plot(rd_adaptguide, type='l',  ylab="RD*1000", xlab="Iteration", ylim=c(-.2, .5))
 plot(rd_adaptguide2, type='l',  ylab="RD*1000", xlab="Iteration", ylim=c(-.2, .5))
@@ -397,5 +397,31 @@ res.ga.init = metropolis_glm(y ~ x, data=magfields, family=binomial(), iter=2000
 summary(res.ga.init, keepburn = FALSE)
 
 plot(res.ga.init, par = 1:2, keepburn=TRUE)
+
+```
+
+## Extending the logistic model results after samples are generated
+Using the function, "risk difference" from above, we can use the output from our prior model to get
+Bayesian estimates of the risk diffence. In general, this is a useful way to extend MCMC simulations
+to new estimands that may not be directly parameterized in the model.
+
+```{r Risk difference after glm_metropolis, fig.width =8, fig.height =5}
+# guided, adaptive
+beta = as.matrix(res.ga.init$parms[, c("b_0", "b_1")])
+
+y = magfields$y
+X = cbind(rep(1, dim(magfields)[1]), magfields$x)
+
+1000*riskdifference(y,X,beta[1,])
+
+# calculate risk difference for every value of model coefficients
+rd.ga.init = apply(beta, 1, function(b) 1000*riskdifference(y,X,b))
+
+par(mfcol=c(2,1))
+ plot(density(rd.ga.init), xlab = "RD*1000", ylab="Kernel density", main="", xlim=c(-.2, 2.5))
+ plot(rd.ga.init, type='l', xlab = "RD*1000", ylab="Iteration", ylim=c(-.2, 2.5))
+par(mfcol=c(1,1))
+
+quantile(rd.ga.init[-c(1:1000)], p = c(.5, .025, .975) )
 
 ```
