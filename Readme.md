@@ -7,61 +7,24 @@
     data("magfields", package="metropolis")
     # see lots of examples here
     vignette("metropolis-vignette", package="metropolis")
+
     table(magfields)
     >          x
     > y      0   1
     >    0 193   5
     >    1  33   3
 
-## Example: fitting a logistic regression model with uniform priors under two different Metropolis algorithms
+    summary(glm(y~x, family=binomial(), data=magfields))$coefficients
+    >              Estimate Std. Error   z value     Pr(>|z|)    > (Intercept) -1.766183   0.188373 -9.375988 6.853094e-21    > x            1.255357   0.754200  1.664488 9.601492e-02
   
+## Example: fitting a logistic regression model with uniform priors under two different Metropolis algorithms
+
 ### Random walk Metropolis
     res.rw = metropolis_glm(y ~ x, data=magfields, family=binomial(), iter=20000, 
                         burnin=3000, adapt=FALSE, guided=FALSE, block=TRUE, inits=c(2,-3), 
                         control = metropolis.control(prop.sigma.start = c(0.05, .1)))
     
     summary(res.rw, keepburn = FALSE)
-    
-    > $nsamples
-    > [1] 20000
-    > 
-    > $sd
-    > (Intercept)           x 
-    >   0.1911599   0.7936077 
-    > 
-    > $se
-    > (Intercept)           x 
-    > 0.002199134 0.009393553 
-    > 
-    > $ESS_beta
-    > [1] 7555.971 7137.597
-    > 
-    > $postmean
-    >                  mean normal_lci normal_uci
-    > (Intercept) -1.779409 -2.1540819  -1.404735
-    > x            1.197478 -0.3579937   2.752949
-    > 
-    > $postmedian
-    >                median   pctl_lci  pctl_uci
-    > (Intercept) -1.776448 -2.1625510 -1.418052
-    > x            1.217966 -0.4181273  2.659286
-    > 
-    > $postmode
-    >                  mode   hpd_lci   hpd_uci
-    > (Intercept) -1.773507 -2.578257 -1.472365
-    > x            1.260855 -3.812090  2.458669
-    
-    plot(res.rw, par = 1:2, keepburn=TRUE)
-
-![RW1](fig/random_walkb0.png)
-
-![RW2](fig/random_walkb1.png)
-
-### Guided, adaptive random walk Metropolis
-    res.ga = metropolis_glm(y ~ x, data=magfields, family=binomial(), iter=20000, 
-                                        burnin=3000, adapt=TRUE, guided=TRUE, block=FALSE, inits=c(2,-3))
-    
-    summary(res.ga, keepburn = FALSE)
     
     > $nsamples
     > [1] 20000
@@ -92,6 +55,48 @@
     > (Intercept) -1.760881 -2.581002 -1.470022
     > x            1.050640 -1.863551  2.282397
     
+
+    
+    plot(res.rw, par = 1:2, keepburn=TRUE)
+
+![RW1](fig/random_walkb0.png)
+
+![RW2](fig/random_walkb1.png)
+
+### Guided, adaptive random walk Metropolis
+    res.ga = metropolis_glm(y ~ x, data=magfields, family=binomial(), iter=20000, 
+                                        burnin=3000, adapt=TRUE, guided=TRUE, block=FALSE, inits=c(2,-3))
+    
+    summary(res.ga, keepburn = FALSE)
+    
+    > $nsamples
+    > [1] 20000
+    > 
+    > $sd
+    > (Intercept)           x 
+    >   0.1911599   0.7936077 
+    > 
+    > $se
+    > (Intercept)           x 
+    > 0.002199134 0.009393553 
+    > 
+    > $ESS_beta
+    > [1] 7555.971 7137.597
+    > 
+    > $postmean
+    >                  mean normal_lci normal_uci
+    > (Intercept) -1.779409 -2.1540819  -1.404735
+    > x            1.197478 -0.3579937   2.752949
+    > 
+    > $postmedian
+    >                median   pctl_lci  pctl_uci
+    > (Intercept) -1.776448 -2.1625510 -1.418052
+    > x            1.217966 -0.4181273  2.659286
+    > 
+    > $postmode
+    >                  mode   hpd_lci   hpd_uci
+    > (Intercept) -1.773507 -2.578257 -1.472365
+    > x            1.260855 -3.812090  2.458669
     plot(res.ga, par = 1:2, keepburn=TRUE)
 
 ![AG1](fig/adaptive_guidedb0.png)
