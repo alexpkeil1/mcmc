@@ -1,0 +1,393 @@
+---
+title: "metropolis"
+author: "Alexander Keil"
+date: "`r Sys.Date()`"
+#output: rmarkdown::pdf_document 
+output: rmarkdown::html_vignette  
+vignette: >
+  %\VignetteIndexEntry{The metropolis algorithm for fitting Bayesian GLMs}
+  %\VignetteEngine{knitr::knitr}
+  \usepackage[utf8]{inputenc}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## A guided walk through the Metropolis algorithmm
+The following vignette contains code to accompany the paper "Markov unchained: a guided walk through the Metropolis algorithm." The code walks the reader through
+
+- Reading in the data
+- Finding maximum likelihood estimates of the log odds ratio and risk difference
+- Simulating posterior distributions of the log odds ratio and risk difference using the following algorithms (described in the paper)
+    - Random walk metropolis
+    - Guided metropolis
+    - Guided, adaptive metropolis
+    - Guided, adaptive metropolis with normal priors
+- Using the "metropolis" r package to carry out the same analysis to simulate a posterior distribution for a logistic model under uniform or normal priors
+- *Note* each algorith used here only runs for 10,000 iterations (to save computational time when installing package). The results will vary more than they would with the larger number of iterations used in the paper.
+
+## The data
+A case control study of leukemia (y=1) and residence around strong magnetic fields (x=1)
+```{r data}
+y = c(rep(1, 36), rep(0, 198)) # leukemia cases
+x = c(rep(1, 3), rep(0, 33), rep(1, 5), rep(0, 193)) # exposure
+```
+
+## Helper functions
+These functions will be used throughout
+```{r Helper functions}
+#helper functions
+expit <- function(mu) 1/(1+exp(-mu))
+
+loglik = function(y,x,beta){
+  # calculate the log likelihood
+  lli = dbinom(y, 1, expit(beta[1] + x*beta[2]), log=TRUE)
+  sum(lli)
+}
+
+riskdifference = function(y,x,beta){
+  # baseline odds (offset)
+  # calculate a risk difference
+  poprisk = 4.8/100000
+  popodds = poprisk/(1-poprisk)
+  studyodds = mean(y)/(1-mean(y))
+  r1 = expit(log(popodds/studyodds) + beta[1] + beta[2])
+  r0 = expit(log(popodds/studyodds) + beta[1])
+  mean(r1-r0)
+}
+```
+
+
+
+## Maximum likelihood estimates
+
+```{r mle, echo=TRUE, results="hold"}
+data = data.frame(leuk=y, magfield=x)
+mod = glm(leuk ~ magfield, family=binomial(), data=data)
+summary(mod)$coefficients
+
+beta1 = summary(mod)$coefficients[2,1]
+se1 = summary(mod)$coefficients[2,2]
+cat("\n\nMaximum likelihood beta coefficient (95% CI)\n")
+round(c(beta=beta1, ll=beta1+se1*qnorm(0.025), ul=beta1+se1*qnorm(0.975)), 2)
+
+cat("\n\nMaximum likelihood odds ratio (95% CI)\n")
+round(exp(c(beta=beta1, ll=beta1+se1*qnorm(0.025), ul=beta1+se1*qnorm(0.975))), 2)
+
+cat("\n\nMaximum likelihood risk difference (multiplied by 1000) \n")
+round(c(rd_1000=riskdifference(y,x,mod$coefficients)*1000), 2)
+
+```
+
+
+
+## Random walk metropolis
+
+```{r random walk metropolis}
+# initialize
+M=10000
+set.seed(91828)
+beta_post = matrix(nrow=M, ncol=2)
+colnames(beta_post) = c('beta0', 'beta1')
+accept = numeric(M)
+rd = numeric(M)
+beta_post[1,] = c(2,-3)
+rd[1] = riskdifference(y,x,beta_post[1,])
+accept[1] = 1
+for(i in 2:M){
+  oldb = beta_post[i-1,]
+  prop = rnorm(2, sd=0.2)
+  newb = oldb+prop
+  num = loglik(y,x,newb)
+  den = loglik(y,x,oldb)
+  acceptprob = exp(num-den)
+  acc = (acceptprob > runif(1))
+  if(acc){
+    beta_post[i,] = newb 
+    accept[i] = 1
+  }else{
+    beta_post[i,] = oldb 
+    accept[i] = 0
+  }
+  rd[i] = 1000*riskdifference(y,x,beta_post[i,])
+}
+
+```
+
+## Inspecting output
+
+```{r Inspecting, fig.width =5, fig.height =6}
+mean(accept)
+summary(beta_post)
+init = beta_post[1,]
+postmean = apply(beta_post[-c(1:1000),], 2, mean)
+cat("Posterior mean\n")
+round(postmean, 2)
+
+plot(beta_post, pch=19, col=rgb(0,0,0,0.05), xlab=expression(beta[0]), ylab=expression(beta[1]), xlim=c(-2.5,2.5), ylim=c(-4.5,4.5))
+points(init[1], init[2], col="red", pch=19)
+points(postmean[1], postmean[2], col="orange", pch=19)
+legend("topright", col=c("red", "orange"), legend=c("Initial value", "Post. mean"), pch=19)
+
+plot(beta_post[,2], type='l',  ylab=expression(beta[1]), xlab="Iteration", ylim=c(-4, 4))
+plot(rd, type='l',  ylab="RD*1000", xlab="Iteration", ylim=c(-4, 4))
+
+plot(density(beta_post[-c(1:1000),2]), xlab=expression(beta[1]), ylab="Density", main="")
+plot(density(rd[-c(1:1000)]), xlab="RD*1000", ylab="Density", main="")
+```
+
+
+
+## Guided metropolis
+
+```{r guided metropolis}
+# initialize
+M=10000
+set.seed(91828)
+beta_post_guide = matrix(nrow=M, ncol=2)
+colnames(beta_post_guide) = c('beta0', 'beta1')
+accept = numeric(M)
+rd_guide = numeric(M)
+beta_post_guide[1,] = c(2,-3)
+rd_guide[1] = riskdifference(y,x,beta_post_guide[1,])
+accept[1] = 1
+dir = 1
+for(i in 2:M){
+  oldb = beta_post_guide[i-1,]
+  prop = dir*abs(rnorm(2, sd=0.2))
+  newb = oldb+prop
+  num = loglik(y,x,newb)
+  den = loglik(y,x,oldb)
+  acceptprob = exp(num-den)
+  acc = (acceptprob > runif(1))
+  if(acc){
+    beta_post_guide[i,] = newb 
+    accept[i] = 1
+  }else{
+    beta_post_guide[i,] = oldb 
+    accept[i] = 0
+    dir = dir*-1
+  }
+  rd_guide[i] = 1000*riskdifference(y,x,beta_post_guide[i,])
+}
+
+postmean = apply(beta_post_guide[-c(1:1000),], 2, mean)
+cat("Posterior mean, guided\n")
+round(postmean, 2)
+
+```
+
+## Contrasting output with random walk
+
+```{r Comparing guided, fig.width =8, fig.height =5}
+col1 = rgb(0,0,0,.5)
+col2 = rgb(1,0,0,.35)
+par(mfcol=c(1,2))
+
+#trace plots
+plot(beta_post[1:200,2], type='l',  ylab=expression(beta[1]), xlab="Iteration", ylim=c(-4, 4), col=col1)
+lines(beta_post_guide[1:200,2], col=col2)
+legend("topright", lty=1, col=c(col1, col2), legend=c("Rand. walk", "Guided"))
+plot(9800:10000, beta_post[9800:10000,2], type='l',  ylab=expression(beta[1]), xlab="Iteration", ylim=c(-4, 4), col=col1)
+lines(9800:10000, beta_post_guide[9800:10000,2], col=col2)
+legend("topright", lty=1, col=c(col1, col2), legend=c("Rand. walk", "Guided"))
+
+# density plots
+plot(density(beta_post_guide[-c(1:1000),2]), col=col2, xlab=expression(beta[1]), ylab="Density", main="")
+lines(density(beta_post[-c(1:1000),2]), col=col1)
+legend("bottomright", lty=1, col=c(col1, col2), legend=c("Rand. walk", "Guided"))
+
+
+plot(density(rd_guide[-c(1:1000)]), xlab="RD*1000", ylab="Density", main="", col=col2)
+lines(density(rd[-c(1:1000)]), col=col1)
+legend("topright", lty=1, col=c(col1, col2), legend=c("Rand. walk", "Guided"))
+par(mfcol=c(1,1))
+```
+
+## Guided, adaptive metropolis algorithm
+
+```{r guided and adaptive metropolis}
+# initialize
+M=10000
+burnin=1000
+set.seed(91828)
+beta_post_adaptguide = matrix(nrow=M+burnin, ncol=2)
+colnames(beta_post_adaptguide) = c('beta0', 'beta1')
+accept = numeric(M+burnin)
+rd_adaptguide = numeric(M+burnin)
+beta_post_adaptguide[1,] = c(2,-3)
+rd_adaptguide[1] = riskdifference(y,x,beta_post[1,])
+accept[1] = 1
+prop.sigma = c(0.2, 0.2)
+dir = 1
+for(i in 2:(M+burnin)){
+  if((i < burnin) & (i > 25)){
+    prop.sigma = apply(beta_post_adaptguide[max(1, i-100):(i-1),], 2, sd)
+  }
+  oldb = beta_post_adaptguide[i-1,]
+  prop = dir*abs(rnorm(2, sd=prop.sigma))
+  newb = oldb+prop
+  num = loglik(y,x,newb)
+  den = loglik(y,x,oldb)
+  acceptprob = exp(num-den)
+  acc = (acceptprob > runif(1))
+  if(acc){
+    beta_post_adaptguide[i,] = newb 
+    accept[i] = 1
+  }else{
+    beta_post_adaptguide[i,] = oldb 
+    accept[i] = 0
+    dir = dir*-1
+  }
+  rd_adaptguide[i] = 1000*riskdifference(y,x,beta_post_adaptguide[i,])
+}
+postmean = apply(beta_post_adaptguide[-c(1:1000),], 2, mean)
+cat("Posterior mean, guided and adaptive\n")
+round(postmean, 2)
+
+```
+## Contrasting output
+
+
+```{r Comparing 2, fig.width =8, fig.height =5}
+col1 = rgb(0,0,0,.5)
+col2 = rgb(1,0,0,.35)
+par(mfcol=c(1,2))
+
+#trace plots
+plot(beta_post[1:200,2], type='l',  ylab=expression(beta[1]), xlab="Iteration", ylim=c(-4, 4), col=col1)
+lines(beta_post_adaptguide[1:200,2], col=col2)
+legend("topright", lty=1, col=c(col1, col2), legend=c("Rand. walk", "Guided, adaptive"))
+plot(9800:10000, beta_post[9800:10000,2], type='l',  ylab=expression(beta[1]), xlab="Iteration", ylim=c(-4, 4), col=col1)
+lines(9800:10000, beta_post_adaptguide[9800:10000,2], col=col2)
+legend("topright", lty=1, col=c(col1, col2), legend=c("Rand. walk", "Guided, adaptive"))
+
+# density plots
+plot(density(beta_post_adaptguide[-c(1:1000),2]), col=col2, xlab=expression(beta[1]), ylab="Density", main="")
+lines(density(beta_post[-c(1:1000),2]), col=col1)
+legend("bottomright", lty=1, col=c(col1, col2), legend=c("Rand. walk", "Guided, adaptive"))
+
+
+plot(density(rd_adaptguide[-c(1:1000)]), xlab="RD*1000", ylab="Density", main="", col=col2)
+lines(density(rd[-c(1:1000)]), col=col1)
+legend("topright", lty=1, col=c(col1, col2), legend=c("Rand. walk", "Guided, adaptive"))
+par(mfcol=c(1,1))
+```
+
+
+## Guided, adaptive metropolis algorithm using normal priors
+
+```{r guided and adaptive metropolis using normal priors}
+# initialize
+M=10000
+burnin=1000
+set.seed(91828)
+beta_post_adaptguide2 = matrix(nrow=M+burnin, ncol=2)
+colnames(beta_post_adaptguide2) = c('beta0', 'beta1')
+accept = numeric(M+burnin)
+rd_adaptguide2 = numeric(M+burnin)
+beta_post_adaptguide2[1,] = c(2,-3)
+rd_adaptguide2[1] = riskdifference(y,x,beta_post[1,])
+accept[1] = 1
+prop.sigma = c(0.2, 0.2)
+dir = 1
+for(i in 2:(M+burnin)){
+  if((i < burnin) & (i > 25)){
+    prop.sigma = apply(beta_post_adaptguide2[max(1, i-100):(i-1),], 2, sd)
+  }
+  oldb = beta_post_adaptguide2[i-1,]
+  prop = dir*abs(rnorm(2, sd=prop.sigma))
+  newb = oldb+prop
+  num = loglik(y,x,newb) + dnorm(newb[1], mean=0, sd=sqrt(100), log=TRUE) + dnorm(newb[2], mean=0, sd=sqrt(0.5), log=TRUE)
+  den = loglik(y,x,oldb) + dnorm(oldb[1], mean=0, sd=sqrt(100), log=TRUE) + dnorm(oldb[2], mean=0, sd=sqrt(0.5), log=TRUE)
+  acceptprob = exp(num-den)
+  acc = (acceptprob > runif(1))
+  if(acc){
+    beta_post_adaptguide2[i,] = newb 
+    accept[i] = 1
+  }else{
+    beta_post_adaptguide2[i,] = oldb 
+    accept[i] = 0
+    dir = dir*-1
+  }
+  rd_adaptguide2[i] = 1000*riskdifference(y,x,beta_post_adaptguide2[i,])
+}
+postmean = apply(beta_post_adaptguide2[-c(1:1000),], 2, mean)
+cat("Posterior mean, guided and adaptive\n")
+round(postmean, 2)
+
+```
+
+## Inspecting output
+
+```{r Inspecting output with normal priors, fig.width =8, fig.height =5}
+mean(accept)
+init = beta_post_adaptguide[1,]
+postmean = apply(beta_post_adaptguide[-c(1:1000),], 2, mean)
+cat("Posterior mean, uniform priors\n")
+round(postmean, 2)
+
+init2 = beta_post_adaptguide2[1,]
+postmean2 = apply(beta_post_adaptguide2[-c(1:1000),], 2, mean)
+cat("Posterior mean, informative normal priors\n")
+round(postmean2, 2)
+
+
+par(mfcol=c(1,2))
+plot(beta_post_adaptguide, pch=19, col=rgb(0,0,0,0.05), xlab=expression(beta[0]), ylab=expression(beta[1]), xlim=c(-2.5,2.5), ylim=c(-4.5,4.5), main="Uniform priors")
+points(init[1], init[2], col="red", pch=19)
+points(postmean[1], postmean[2], col="orange", pch=19)
+legend("topright", col=c("red", "orange"), legend=c("Initial value", "Post. mean"), pch=19)
+
+plot(beta_post_adaptguide2, pch=19, col=rgb(0,0,0,0.05), xlab=expression(beta[0]), ylab=expression(beta[1]), xlim=c(-2.5,2.5), ylim=c(-4.5,4.5), main="Informative priors")
+points(init2[1], init2[2], col="red", pch=19)
+points(postmean2[1], postmean2[2], col="orange", pch=19)
+legend("topright", col=c("red", "orange"), legend=c("Initial value", "Post. mean"), pch=19)
+
+par(mfcol=c(1,1))
+plot(beta_post_adaptguide2[,2], type='l',  ylab=expression(beta[1]), xlab="Iteration", ylim=c(-4, 4))
+plot(rd, type='l',  ylab="RD*1000", xlab="Iteration", ylim=c(-4, 4))
+
+plot(density(beta_post_adaptguide2[-c(1:1000),2]), xlab=expression(beta[1]), ylab="Density", main="")
+plot(density(rd[-c(1:1000)]), xlab="RD*1000", ylab="Density", main="")
+```
+
+
+## Using the R package
+Given what you know, running the R package function `metropolis_glm` should 
+be fairly straightforward. The following example calls in the case-control data used above
+and compares a randome Walk metropolis algorithmn (with N(0, 0.05), N(0, 0.1) proposal distribution) with a guided, adaptive algorithm.
+
+```{r Using the R package, fig.width =8, fig.height =5}
+library(metropolis)
+data("magfields", package="metropolis")
+
+# random walk
+res.rw = metropolis_glm(y ~ x, data=magfields, family=binomial(), iter=20000, burnin=3000, adapt=FALSE, guided=FALSE, block=TRUE, inits=c(2,-3), control = metropolis.control(prop.sigma.start = c(0.05, .1)))
+
+summary(res.rw, keepburn = FALSE)
+
+plot(res.rw, par = 1:2, keepburn=TRUE)
+
+# guided, adaptive
+res.ga = metropolis_glm(y ~ x, data=magfields, family=binomial(), iter=20000, burnin=3000, adapt=TRUE, guided=TRUE, block=FALSE, inits=c(2,-3))
+
+summary(res.ga, keepburn = FALSE)
+
+plot(res.ga, par = 1:2, keepburn=TRUE)
+
+```
+## Using the R package
+Finally, we can use the "glm" option in initial values to initialize the chain with the MLE estimates.
+This can eke out slightly more efficiency and allow reduced burnin.
+
+```{r Initial values, fig.width =8, fig.height =5}
+# guided, adaptive
+res.ga.init = metropolis_glm(y ~ x, data=magfields, family=binomial(), iter=20000, burnin=1000, adapt=TRUE, guided=TRUE, block=FALSE, inits="glm")
+
+summary(res.ga.init, keepburn = FALSE)
+
+plot(res.ga.init, par = 1:2, keepburn=TRUE)
+
+```
