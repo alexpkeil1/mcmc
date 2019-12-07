@@ -4,10 +4,10 @@
 \alias{as.mcmc.metropolis.samples}
 \title{Convert glm_metropolis output to `mcmc` object from package coda}
 \usage{
-\method{as.mcmc}{metropolis.samples}(object, ...)
+\method{as.mcmc}{metropolis.samples}(x, ...)
 }
 \arguments{
-\item{object}{an object from the function "metropolis"}
+\item{x}{an object from the function "metropolis"}
 
 \item{...}{not used}
 }

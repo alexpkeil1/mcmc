@@ -1,6 +1,6 @@
 Package: metropolis
 Title: The Metropolis algorithm
-Version: 0.1.1
+Version: 0.1.2
 Date: 2019-12-06
 Authors@R: 
     person(given = "Alexander",
@@ -19,6 +19,7 @@ Description: The `metropolis`` package is an instructional
     walk Metropolis algorithms.
 License: GPL (>= 2)
 Depends: 
+    coda,
     R (>= 3.5.0)
 Imports: 
     stats

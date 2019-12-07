@@ -63,12 +63,15 @@ summary.metropolis.samples <- function(object, keepburn=FALSE, ...){
 
   #estimates based on posterior mode (via kernal density), highest probability density based intervals
   dens.beta <- apply(sims, 2, density) 
-  mode.beta = sapply(dens.beta, function(x) x$x[which.max(x$y)][1])
+  #mode.beta = sapply(dens.beta, function(x) x$x[which.max(x$y)][1])
+  mode.beta = as.numeric(sims[which.max(object$lpost[object$parms$burn<ifelse(keepburn, 2, 1)]),][1,])
+  names(mode.beta) <- names(mean.beta)
   hpdfun <- function(x, p=0.95){
    x = sort(x)
    xl = length(x)
-   g = round(xl*p)
-   idx = which.min(x[1:(xl-g)])
+   g = max(1, min(xl-1, round(xl*p)))
+   init <- 1:(xl - g)
+   idx = which.min(x[init + g] - x[init])
    c(x[idx], x[idx+g])
   }
   hpd.beta = apply(sims, 2, function(x) hpdfun(x, c(0.95)))
@@ -279,6 +282,7 @@ metropolis_glm <- function(
 
     # create empty matrixes/vectors for posterior estimates
     accept <- parms <- matrix(nrow=iter+burnin, ncol=p)
+    lpost <- numeric(iter+burnin)
     proposals = NULL
   # generate initial values
     if(is.null(inits)){
@@ -290,6 +294,7 @@ metropolis_glm <- function(
       if(family$family == "gaussian") inits = c(logscale=log(sd(mlefit$residuals)), beta=inits)
     }
     parms[1,] <- inits
+    lpost[1] <- calcpost(y,X,inits,family, pm, pv)  
     if(saveproposal & length(block)==1 && block) proposals = parms
     if(length(control$prop.sigma.start)==1){
       cov = rep(control$prop.sigma.start, p)
@@ -333,6 +338,7 @@ metropolis_glm <- function(
         b.cand = b.cand - z
         dir = dir
       }
+      #lpost[i] <- ifelse(a, lp, llp)
       accept[i,] = a
     } else{ # partial blocks, or update 1 by 1
       # loop over parameters
@@ -367,6 +373,7 @@ metropolis_glm <- function(
         accept[i,q] = a
       }# end loop over blocks
     } # end partial blocks, or update 1 by 1
+    lpost[i] <- ifelse(a, lp, llp)
     parms[i,] = b.cand
   } #loop over i
   bt = data.frame(parms)
@@ -378,7 +385,8 @@ metropolis_glm <- function(
   bt <- bt[,c('iter', 'burn', grep('logsigma|b_', names(bt), value = TRUE, fixed=FALSE))]
   # output an R list with posterior samples, acceptance rate, and covariance of proposal distribution
   res = list(parms = bt, 
-             accept=accept, 
+             accept=accept,
+             lpost=lpost,
              cov=cov, 
              iter=iter, 
              burnin=burnin, 
@@ -388,31 +396,65 @@ metropolis_glm <- function(
              guided=guided,
              adaptive = adaptive,
              priors = ifelse(is.null(pm), "uniform", "normal"),
+             pm = pm,
+             pv = pv,
              inits = inits,
-             proposals = proposals
+             proposals = proposals,
+             adaptive = adaptive,
+             guided=guided,
+             block=block
              )
   class(res) <- "metropolis.samples"
   res
 }
 
 
+
+# sample.metropolis.samples <- function(x, iter, data){
+#   existsamp = x$parms[,grep('logsigma|b_', names(x$parms), value = TRUE, fixed=FALSE)]
+#   newsamps = metropolis_glm(
+#     f=x$f, 
+#     data,
+#     family=x$family,
+#     iter=iter, 
+#     burnin=0, 
+#     pm=x$pm, 
+#     pv=x$pv, 
+#     chain=1, 
+#     prop.sigma.start=.1, 
+#     inits=existsamp[dim(existsamp)[1],], 
+#     adaptive=TRUE, 
+#     guided=FALSE, 
+#     block=TRUE,
+#     saveproposal=FALSE,
+#     control = metropolis.control(prop.sigma.start = x$cov),
+#     adaptive = x$adaptive,
+#     guided = x$guided,
+#     block = x$block
+#   )
+# }
+
+
 # coda object
-as.mcmc.metropolis.samples <- function(object, ...){
+as.mcmc.metropolis.samples <- function(x, ...){
   #' @title Convert glm_metropolis output to `mcmc` object from package coda
   #'
   #' @description Allows use of useful functions from `coda` package
   #' @details TBA
-  #' @param object an object from the function "metropolis"
+  #' @param x an object from the function "metropolis"
   #' @param ... not used
   #' @importFrom coda mcmc
-  #' @importFrom coda as.mcmc
   #' @export
+  #' @method as.mcmc metropolis.samples
   #' @examples
   #' runif(1)
-  samples = object$parms[object$parms$burn==0,grep('logsigma|b_', names(object$parms), value = TRUE, fixed=FALSE)]
+  samples = x$parms[x$parms$burn==0,grep('logsigma|b_', names(x$parms), value = TRUE, fixed=FALSE)]
   mcmc(data= samples, 
-       start =  object$burnin, 
-       end = object$iter,
+       start =  x$burnin, 
+       end = x$iter,
        thin = 1)
   
 }
+
+
+
