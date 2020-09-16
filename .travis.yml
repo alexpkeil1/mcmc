@@ -1,4 +1,4 @@
-before_script: cd Rpkg/metropolis
+before_install:: cd Rpkg/metropolis
 
 language: r
 
