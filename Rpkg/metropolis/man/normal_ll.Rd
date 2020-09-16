@@ -13,6 +13,10 @@ normal_ll(y, X, par)
 
 \item{par}{vector of gaussian scale parameter followed by model coefficients}
 }
+\value{
+a scalar quantity proportional to a normal likelihood
+with linear parameterization, given y, X, and par
+}
 \description{
 Gaussian log likelihood
 }

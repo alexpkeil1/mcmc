@@ -13,6 +13,10 @@ logistic_ll(y, X, par)
 
 \item{par}{vector of model coefficients}
 }
+\value{
+a scalar quantity proportional to a binomial likelihood
+with logistic parameterization, given y,X,and par
+}
 \description{
 logistic log likelihood
 }

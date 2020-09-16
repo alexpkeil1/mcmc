@@ -4,11 +4,23 @@
 \alias{metropolis_glm}
 \title{Use the Metropolis Hastings algorithm to estimate Bayesian glm parameters}
 \usage{
-metropolis_glm(f, data, family = binomial(), iter = 100,
-  burnin = round(iter/2), pm = NULL, pv = NULL, chain = 1,
-  prop.sigma.start = 0.1, inits = NULL, adaptive = TRUE,
-  guided = FALSE, block = TRUE, saveproposal = FALSE,
-  control = metropolis.control())
+metropolis_glm(
+  f,
+  data,
+  family = binomial(),
+  iter = 100,
+  burnin = round(iter/2),
+  pm = NULL,
+  pv = NULL,
+  chain = 1,
+  prop.sigma.start = 0.1,
+  inits = NULL,
+  adaptive = TRUE,
+  guided = FALSE,
+  block = TRUE,
+  saveproposal = FALSE,
+  control = metropolis.control()
+)
 }
 \arguments{
 \item{f}{an R style formula (e.g. y ~ x1 + x2)}
@@ -47,21 +59,36 @@ intercept separately from the other three parameters.) If TRUE, then updates eac
 
 \item{control}{parameters that control fitting algorithm. See metropolis.control()}
 }
+\value{
+An object of type "metropolis.samples" which is a named list containing posterior
+MCMC samples as well as some fitting information.
+}
 \description{
-This function carries out the metropolis algorithm.
+This function carries out the Metropolis algorithm.
 }
 \details{
-TBA
+Implements the Metropolis algorithm, which allows user specified proposal distributions
+ or implements an adaptive algorithm as described by 
+ Gelman et al. (2014, ISBN: 9781584883883).
+ This function also allows the "Guided" Metropolis algorithm of 
+ Gustafson (1998) <doi:10.1023/A:1008880707168>. Note that by default all
+ parameters are estimated simulataneously via "block" sampling, but this
+ default behavior can be changed with the "block" parameter. When using 
+ guided=TRUE, block should be set to FALSE.
 }
 \examples{
 dat = data.frame(y = rbinom(100, 1, 0.5), x1=runif(100), x2 = runif(100))
-res = metropolis_glm(y ~ x1 + x2, data=dat, family=binomial(), iter=10000, burnin=3000, 
+\donttest{
+res = metropolis_glm(y ~ x1 + x2, data=dat, family=binomial(), iter=1000, burnin=3000, 
 adapt=TRUE, guided=TRUE, block=FALSE)
-apply(res$parms, 2, mean)
+res
+summary(res)
+apply(res$parms, 2, mean)}
 glm(y ~ x1 + x2, family=binomial(), data=dat)
 dat = data.frame(y = rnorm(100, 1, 0.5), x1=runif(100), x2 = runif(100), x3 = rpois(100, .2))
+\donttest{
 res = metropolis_glm(y ~ x1 + x2 + factor(x3), data=dat, family=gaussian(), inits="glm", 
 iter=10000, burnin=3000, adapt=TRUE, guide=TRUE, block=FALSE)
 apply(res$parms, 2, mean)
-glm(y ~ x1 + x2+ factor(x3), family=gaussian(), data=dat)
+glm(y ~ x1 + x2+ factor(x3), family=gaussian(), data=dat)}
 }

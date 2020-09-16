@@ -1,7 +1,7 @@
 Package: metropolis
-Title: The Metropolis algorithm
-Version: 0.1.2
-Date: 2019-12-06
+Title: The Metropolis Algorithm
+Version: 0.1.5
+Date: 2020-01-12
 Authors@R: 
     person(given = "Alexander",
            family = "Keil",
@@ -9,14 +9,15 @@ Authors@R:
            email = "akeil@unc.edu")
 Author: Alexander Keil [aut, cre]
 Maintainer: Alexander Keil <akeil@unc.edu>
-Description: The `metropolis`` package is an instructional
-    package for learning and using the Metropolis algorithm for Bayesian
-    fitting of a generalized linear model. The package vignette includes
-    examples of hand-coding a logistic model using several variants of the
-    Metropolis algorithm. The package also contains prebuilt functions for
-    simulating posterior distributions of Bayesian generalized linear
-    model parameters using guided, adaptive, guided-adaptive and random
-    walk Metropolis algorithms.
+Description: Learning and using the Metropolis algorithm for
+    Bayesian fitting of a generalized linear model. The package vignette
+    includes examples of hand-coding a logistic model using several
+    variants of the Metropolis algorithm. The package also contains R
+    functions for simulating posterior distributions of Bayesian
+    generalized linear model parameters using guided, adaptive,
+    guided-adaptive and random walk Metropolis algorithms. The random walk
+    Metropolis algorithm was originally described in Metropolis et al
+    (1953) <doi:10.1063/1.1699114>.
 License: GPL (>= 2)
 Depends: 
     coda,
@@ -30,4 +31,4 @@ VignetteBuilder:
 Encoding: UTF-8
 Language: en-US
 LazyData: true
-RoxygenNote: 6.1.1
+RoxygenNote: 7.0.2

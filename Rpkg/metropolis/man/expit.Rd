@@ -9,10 +9,17 @@ expit(mu)
 \arguments{
 \item{mu}{log-odds}
 }
+\value{
+returns a scalar or vector the same length 
+as mu with values that are the inverse logit transform 
+of mu
+}
 \description{
 Inverse logit transform
 }
 \examples{
 logodds = rnorm(10)
+expit(logodds)
+logodds = log(1.0)
 expit(logodds)
 }

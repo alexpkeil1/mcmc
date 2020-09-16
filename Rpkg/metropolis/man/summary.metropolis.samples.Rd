@@ -14,6 +14,16 @@ will yield potentially invalid summaries)}
 
 \item{...}{not used}
 }
+\value{
+returns a list with the following fields:
+    nsamples: number of simulated samples 
+    sd: standard deviation of parameter distributions 
+    se: standard deviation of parameter distribution means 
+    ESS_parms: effective sample size of parameter distribution means 
+    postmean: posterior means and normal based 95% credible intervals 
+    postmedian: posterior medians and percentile based 95% credible intervals 
+    postmode: posterior modes and highest posterior density based 95% credible intervals
+}
 \description{
 This function allows you to summarize output from the metropolis function.
 }
@@ -21,5 +31,8 @@ This function allows you to summarize output from the metropolis function.
 TBA
 }
 \examples{
-runif(1)
+dat = data.frame(y = rbinom(100, 1, 0.5), x1=runif(100), x2 = runif(100))
+res = metropolis_glm(y ~ x1 + x2, data=dat, family=binomial(), iter=10000, burnin=3000, 
+adapt=TRUE, guided=TRUE, block=FALSE)
+summary(res)
 }

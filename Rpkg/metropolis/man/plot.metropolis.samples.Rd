@@ -4,8 +4,7 @@
 \alias{plot.metropolis.samples}
 \title{Plot the output from the metropolis function}
 \usage{
-\method{plot}{metropolis.samples}(x, keepburn = FALSE, parms = NULL,
-  ...)
+\method{plot}{metropolis.samples}(x, keepburn = FALSE, parms = NULL, ...)
 }
 \arguments{
 \item{x}{the outputted object from the "metropolis_glm" function}
@@ -16,6 +15,9 @@
 
 \item{...}{other arguments to plot}
 }
+\value{
+None
+}
 \description{
 This function allows you to summarize output from the metropolis function.
 }
@@ -23,5 +25,8 @@ This function allows you to summarize output from the metropolis function.
 TBA
 }
 \examples{
-runif(1)
+dat = data.frame(y = rbinom(100, 1, 0.5), x1=runif(100), x2 = runif(100))
+res = metropolis_glm(y ~ x1 + x2, data=dat, family=binomial(), iter=10000, burnin=3000, 
+adapt=TRUE, guided=TRUE, block=FALSE)
+plot(res)
 }

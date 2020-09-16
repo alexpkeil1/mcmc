@@ -4,9 +4,14 @@
 \alias{metropolis.control}
 \title{metropolis.control}
 \usage{
-metropolis.control(adapt.start = 25, adapt.window = 200,
-  adapt.update = 25, min.sigma = 0.001, prop.sigma.start = 1,
-  scale = 2.4)
+metropolis.control(
+  adapt.start = 25,
+  adapt.window = 200,
+  adapt.update = 25,
+  min.sigma = 0.001,
+  prop.sigma.start = 1,
+  scale = 2.4
+)
 }
 \arguments{
 \item{adapt.start}{start adapting after this many iterations; set to iter+1 to turn off adaptation}
@@ -23,7 +28,9 @@ standard deviation}
 
 \item{scale}{scale value for adaptation (how much should the posterior
 variance estimate be scaled by?). Scale/sqrt(p) is used in metropolis_glm function, and 
-Gelman et al. (Bayesian Data Analysis v3, p 296) recommend a scale of 2.4}
+Gelman et al. (2014, ISBN: 9781584883883) recommend a scale of 2.4
+@return A list of parameters used in fitting with the following named objects
+  adapt.start, adapt.window,adapt.update,min.sigma,prop.sigma.start,scale}
 }
 \description{
 metropolis.control

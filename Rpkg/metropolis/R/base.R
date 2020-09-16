@@ -1,15 +1,27 @@
 expit <- function(mu){
   #' @title Inverse logit transform
   #'
-  #' @param mu log-odds 
+  #' @param mu log-odds
+  #' @return returns a scalar or vector the same length 
+  #' as mu with values that are the inverse logit transform 
+  #' of mu 
   #' @export
   #' @examples
   #' logodds = rnorm(10)
+  #' expit(logodds)
+  #' logodds = log(1.0)
   #' expit(logodds)
   1/(1+exp(-mu))
 }
 
 print.metropolis.samples <- function(x, ...){
+  #' @title Print a metropolis.samples object
+  #'
+  #' @description This function allows you to summarize output from the "metropolis_glm" function.
+  #' @details None 
+  #' @param x a "metropolis.samples" object from the function "metropolis_glm"
+  #' @param ... not used.
+  #' @return An unmodified "metropolis.samples" object (invisibly)
   fam = x$family$family
   mod = as.character(x$f)
   fun = paste(mod[2], mod[1], mod[3])
@@ -17,7 +29,6 @@ print.metropolis.samples <- function(x, ...){
   cat(paste0(" Model: ", fun, "    (", fam, ")\n"))
   cat(paste0(" Guided: ", x$guided,  "\n"))
   cat(paste0(" Adaptive: ", x$adaptive,  "\n"))
-  #cat(paste0("\n Initial values: ", x$inits,  "\n"))
   invisible(x)    
 }
 
@@ -31,10 +42,21 @@ summary.metropolis.samples <- function(object, keepburn=FALSE, ...){
   #' @param keepburn keep the burnin iterations in calculations (if adapt=TRUE, keepburn=TRUE 
   #' will yield potentially invalid summaries)
   #' @param ... not used
+  #' @return returns a list with the following fields:
+  #'     nsamples: number of simulated samples 
+  #'     sd: standard deviation of parameter distributions 
+  #'     se: standard deviation of parameter distribution means 
+  #'     ESS_parms: effective sample size of parameter distribution means 
+  #'     postmean: posterior means and normal based 95% credible intervals 
+  #'     postmedian: posterior medians and percentile based 95% credible intervals 
+  #'     postmode: posterior modes and highest posterior density based 95% credible intervals
   #' @export
   #' @examples
-  #' runif(1)
-
+  #' dat = data.frame(y = rbinom(100, 1, 0.5), x1=runif(100), x2 = runif(100))
+  #' res = metropolis_glm(y ~ x1 + x2, data=dat, family=binomial(), iter=10000, burnin=3000, 
+  #' adapt=TRUE, guided=TRUE, block=FALSE)
+  #' summary(res)
+  
   # function to compute summary of probability distribution sampled via
   # metropolis-hastings algorithm
   samples = object$parms[object$parms$burn<ifelse(keepburn, 2, 1),]
@@ -44,28 +66,32 @@ summary.metropolis.samples <- function(object, keepburn=FALSE, ...){
   names(sims) <- nms
   nsims = dim(sims)[1]
   
-  #effective sample size
-  ar.beta = apply(sims, 2, ar)
-  sv.beta = sapply(ar.beta, function(x) x$var.pred/(1-sum(x$ar))^2)
-  var.beta = apply(sims, 2, var)
-  ess.beta = pmin(nsims, nsims*var.beta/sv.beta)
+  #effective sample size 
+  # geyer 1992 (not yet finished)
+  #autocorr = apply(sims, 2, function(x) ar(x, aic=FALSE, order.max=50)$ar)
+  #autocorrs = apply(autocorr, 2, function(x) cumsum(c(0, diff(c(0,diff(x<0))))==-1))
+  # coda package
+  ar.parms = apply(sims, 2, ar)
+  sv.parms = sapply(ar.parms, function(x) x$var.pred/(1-sum(x$ar))^2)
+  var.parms = apply(sims, 2, var)
+  ess.parms = pmin(nsims, nsims*var.parms/sv.parms)
 
   #estimates based on posterior mean, normal approx probability intervals
-  (mean.beta  <- apply(sims, 2, mean))
-  (sd.beta  <- sqrt(var.beta))
-  lci.normal.beta <- mean.beta-1.96*sd.beta
-  uci.normal.beta <- mean.beta+1.96*sd.beta
+  (mean.parms  <- apply(sims, 2, mean))
+  (sd.parms  <- sqrt(var.parms))
+  lci.normal.parms <- mean.parms-1.96*sd.parms
+  uci.normal.parms <- mean.parms+1.96*sd.parms
 
   #estimates based on posterior median, quantile based probability intervals
-  median.beta = apply(sims, 2, function(x) quantile(x, c(0.5)))
-  lci.quantile.beta <- apply(sims, 2, function(x) quantile(x, c(0.025)))
-  uci.quantile.beta <- apply(sims, 2, function(x) quantile(x, c(0.975)))
+  median.parms = apply(sims, 2, function(x) quantile(x, c(0.5)))
+  lci.quantile.parms <- apply(sims, 2, function(x) quantile(x, c(0.025)))
+  uci.quantile.parms <- apply(sims, 2, function(x) quantile(x, c(0.975)))
 
   #estimates based on posterior mode (via kernal density), highest probability density based intervals
-  dens.beta <- apply(sims, 2, density) 
-  #mode.beta = sapply(dens.beta, function(x) x$x[which.max(x$y)][1])
-  mode.beta = as.numeric(sims[which.max(object$lpost[object$parms$burn<ifelse(keepburn, 2, 1)]),][1,])
-  names(mode.beta) <- names(mean.beta)
+  dens.parms <- apply(sims, 2, density) 
+  #mode.parms = sapply(dens.parms, function(x) x$x[which.max(x$y)][1])
+  mode.parms = as.numeric(sims[which.max(object$lpost[object$parms$burn<ifelse(keepburn, 2, 1)]),][1,])
+  names(mode.parms) <- names(mean.parms)
   hpdfun <- function(x, p=0.95){
    x = sort(x)
    xl = length(x)
@@ -74,18 +100,18 @@ summary.metropolis.samples <- function(object, keepburn=FALSE, ...){
    idx = which.min(x[init + g] - x[init])
    c(x[idx], x[idx+g])
   }
-  hpd.beta = apply(sims, 2, function(x) hpdfun(x, c(0.95)))
-  lci.hpd.beta <- hpd.beta[1,]
-  uci.hpd.beta <- hpd.beta[2,]
+  hpd.parms = apply(sims, 2, function(x) hpdfun(x, c(0.95)))
+  lci.hpd.parms <- hpd.parms[1,]
+  uci.hpd.parms <- hpd.parms[2,]
 
   list(
     nsamples = nsims,
-    sd = sd.beta,
-    se = sd.beta/sqrt(ess.beta),
-    ESS_beta = ess.beta,
-     postmean = cbind(mean=mean.beta, normal_lci=lci.normal.beta, normal_uci=uci.normal.beta),
-     postmedian = cbind(median = median.beta, pctl_lci = lci.quantile.beta, pctl_uci = uci.quantile.beta),
-     postmode = cbind(mode=mode.beta, hpd_lci = lci.hpd.beta, hpd_uci = uci.hpd.beta)
+    sd = sd.parms,
+    se = sd.parms/sqrt(ess.parms),
+    ESS_parms = ess.parms,
+     postmean = cbind(mean=mean.parms, normal_lci=lci.normal.parms, normal_uci=uci.normal.parms),
+     postmedian = cbind(median = median.parms, pctl_lci = lci.quantile.parms, pctl_uci = uci.quantile.parms),
+     postmode = cbind(mode=mode.parms, hpd_lci = lci.hpd.parms, hpd_uci = uci.hpd.parms)
      )
 }
 
@@ -100,20 +126,25 @@ plot.metropolis.samples <- function(x, keepburn=FALSE, parms=NULL, ...){
   #' @param ... other arguments to plot
   #' @import stats graphics
   #' @importFrom grDevices dev.hold
+  #' @return None
   #' @export
   #' @examples
-  #' runif(1)
+  #' dat = data.frame(y = rbinom(100, 1, 0.5), x1=runif(100), x2 = runif(100))
+  #' res = metropolis_glm(y ~ x1 + x2, data=dat, family=binomial(), iter=10000, burnin=3000, 
+  #' adapt=TRUE, guided=TRUE, block=FALSE)
+  #' plot(res)
+  opar <- par(no.readonly = TRUE)       
+  on.exit(par(opar))                  
   samples = x$parms[x$parms$burn<ifelse(keepburn, 2, 1),]
   sims = samples[, -grep("burn|iter", names(samples))]
   nms = x$dimnames
   if(x$family$family=="gaussian") nms = c("logsigma", nms)
   names(sims) <- nms
-  nsims = dim(sims)[1]
+  #nsims = dim(sims)[1]
   if(isTRUE(parms[1])) parms = names(sims)
   if(is.null(parms[1])) parms = 1
   
   plsims = sims[,parms, drop=FALSE]
-  oldmar = par()$mar
   if(!keepburn) idx=(x$burn+1):(x$burn+x$iter)
   if(keepburn) idx=1:(x$burn+x$iter)
   par(mfcol=c(2,1), mar=c(3,4,1,1))
@@ -124,7 +155,6 @@ plot.metropolis.samples <- function(x, keepburn=FALSE, parms=NULL, ...){
     #trace plot
     plot(idx, plsims[,k], type="l", ylab=names(plsims)[k], ...)
   }
-  par(mfcol=c(1,1), mar=oldmar)
 }
 
 
@@ -134,6 +164,8 @@ logistic_ll <- function(y, X, par){
   #' @param y binary outcome 
   #' @param X design matrix 
   #' @param par vector of model coefficients 
+  #' @return a scalar quantity proportional to a binomial likelihood
+  #' with logistic parameterization, given y,X,and par
   sum(dbinom(y, 1, expit(X %*% par), log=TRUE))
 }
 
@@ -143,6 +175,8 @@ normal_ll <- function(y, X, par){
   #' @param y binary outcome 
   #' @param X design matrix 
   #' @param par vector of gaussian scale parameter followed by model coefficients 
+  #' @return a scalar quantity proportional to a normal likelihood
+  #' with linear parameterization, given y, X, and par
   beta = par[-1]
   sig = par[1]
   sum(dnorm(y, X %*% beta, sig, log=TRUE))
@@ -167,7 +201,9 @@ metropolis.control <- function(
   #' standard deviation
   #' @param scale scale value for adaptation (how much should the posterior
   #'  variance estimate be scaled by?). Scale/sqrt(p) is used in metropolis_glm function, and 
-  #'  Gelman et al. (Bayesian Data Analysis v3, p 296) recommend a scale of 2.4
+  #'  Gelman et al. (2014, ISBN: 9781584883883) recommend a scale of 2.4
+  #'  @return A list of parameters used in fitting with the following named objects
+  #'    adapt.start, adapt.window,adapt.update,min.sigma,prop.sigma.start,scale
   #' @export
   list(
     adapt.start = adapt.start, 
@@ -216,8 +252,15 @@ metropolis_glm <- function(
                        ) {
   #' @title Use the Metropolis Hastings algorithm to estimate Bayesian glm parameters
   #'
-  #' @description This function carries out the metropolis algorithm.
-  #' @details TBA
+  #' @description This function carries out the Metropolis algorithm.
+  #' @details Implements the Metropolis algorithm, which allows user specified proposal distributions
+  #'  or implements an adaptive algorithm as described by 
+  #'  Gelman et al. (2014, ISBN: 9781584883883).
+  #'  This function also allows the "Guided" Metropolis algorithm of 
+  #'  Gustafson (1998) <doi:10.1023/A:1008880707168>. Note that by default all
+  #'  parameters are estimated simulataneously via "block" sampling, but this
+  #'  default behavior can be changed with the "block" parameter. When using 
+  #'  guided=TRUE, block should be set to FALSE.
   #' @param f an R style formula (e.g. y ~ x1 + x2)
   #' @param data an R data frame containing the variables in f
   #' @param family R glm style family that determines model form: normal() or binomial()
@@ -239,47 +282,48 @@ metropolis_glm <- function(
   #' 1 by 1. Using "guide=TRUE" with blocking=<vector> is not advised
   #' @param saveproposal (logical, default=FALSE) save the rejected proposals (block=TRUE only)?
   #' @param control parameters that control fitting algorithm. See metropolis.control()
+  #' @return An object of type "metropolis.samples" which is a named list containing posterior
+  #' MCMC samples as well as some fitting information.
   #' @import stats
   #' @export
   #' @examples
   #' dat = data.frame(y = rbinom(100, 1, 0.5), x1=runif(100), x2 = runif(100))
-  #' res = metropolis_glm(y ~ x1 + x2, data=dat, family=binomial(), iter=10000, burnin=3000, 
+  #' \donttest{
+  #' res = metropolis_glm(y ~ x1 + x2, data=dat, family=binomial(), iter=1000, burnin=3000, 
   #' adapt=TRUE, guided=TRUE, block=FALSE)
-  #' apply(res$parms, 2, mean)
+  #' res
+  #' summary(res)
+  #' apply(res$parms, 2, mean)}
   #' glm(y ~ x1 + x2, family=binomial(), data=dat)
   #' dat = data.frame(y = rnorm(100, 1, 0.5), x1=runif(100), x2 = runif(100), x3 = rpois(100, .2))
+  #' \donttest{
   #' res = metropolis_glm(y ~ x1 + x2 + factor(x3), data=dat, family=gaussian(), inits="glm", 
   #' iter=10000, burnin=3000, adapt=TRUE, guide=TRUE, block=FALSE)
   #' apply(res$parms, 2, mean)
-  #' glm(y ~ x1 + x2+ factor(x3), family=gaussian(), data=dat)
+  #' glm(y ~ x1 + x2+ factor(x3), family=gaussian(), data=dat)}
   # error catching 
   if (is.character(family)) 
     family <- get(family, mode = "function", envir = parent.frame())
   if (is.function(family)) 
     family <- family()
   if (is.null(family$family)) {
-    print(family)
     stop("'family' not recognized")
   }
   if (!(family$family %in% c("gaussian", "binomial"))) {
-    print(family)
     stop("only 'gaussian' and 'binomial' families are currently implemented")
   }
   if(length(block)>1 & guided){
     warning("Block sampling with 'guided=TRUE' is not advised, unless block=TRUE")
   }
-  
   # collect some info on data
     X = model.matrix(f, data = data)
     mterm = terms(f)
     outcol = as.character(attr(mterm, "variables")[[2]])
     y = data[,outcol]
-    
     p = dim(X)[2] # number of parameters
     if(family$family == "gaussian"){
       p = p+1 # scale parameter
     }
-
     # create empty matrixes/vectors for posterior estimates
     accept <- parms <- matrix(nrow=iter+burnin, ncol=p)
     lpost <- numeric(iter+burnin)
@@ -443,11 +487,17 @@ as.mcmc.metropolis.samples <- function(x, ...){
   #' @details TBA
   #' @param x an object from the function "metropolis"
   #' @param ... not used
-  #' @importFrom coda mcmc
+  #' @return An object of type "mcmc" from the coda package
+  #' @importFrom coda mcmc as.mcmc
   #' @export
   #' @method as.mcmc metropolis.samples
   #' @examples
-  #' runif(1)
+  #' library("coda")
+  #' dat = data.frame(y = rbinom(100, 1, 0.5), x1=runif(100), x2 = runif(100))
+  #' res = metropolis_glm(y ~ x1 + x2, data=dat, family=binomial(), iter=10000, burnin=3000, 
+  #' adapt=TRUE, guided=TRUE, block=FALSE)
+  #' res2 = as.mcmc(res)
+  #' summary(res2)
   samples = x$parms[x$parms$burn==0,grep('logsigma|b_', names(x$parms), value = TRUE, fixed=FALSE)]
   mcmc(data= samples, 
        start =  x$burnin, 
@@ -455,6 +505,3 @@ as.mcmc.metropolis.samples <- function(x, ...){
        thin = 1)
   
 }
-
-
-

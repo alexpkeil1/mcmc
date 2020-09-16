@@ -1,4 +1,4 @@
-# metropolis v0.1.0
+# metropolis v0.1.5
 ## Major changes
 - First release on CRAN
 

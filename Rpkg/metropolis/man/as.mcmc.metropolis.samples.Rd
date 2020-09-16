@@ -11,6 +11,9 @@
 
 \item{...}{not used}
 }
+\value{
+An object of type "mcmc" from the coda package
+}
 \description{
 Allows use of useful functions from `coda` package
 }
@@ -18,5 +21,10 @@ Allows use of useful functions from `coda` package
 TBA
 }
 \examples{
-runif(1)
+library("coda")
+dat = data.frame(y = rbinom(100, 1, 0.5), x1=runif(100), x2 = runif(100))
+res = metropolis_glm(y ~ x1 + x2, data=dat, family=binomial(), iter=10000, burnin=3000, 
+adapt=TRUE, guided=TRUE, block=FALSE)
+res2 = as.mcmc(res)
+summary(res2)
 }
