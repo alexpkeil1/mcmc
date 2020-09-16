@@ -1,7 +1,11 @@
+before_script: cd Rpkg/metropolis
+
 language: r
 
 r:
   - release
+
+install: travis_wait 30 mvn install
 
 os:
   - osx
