@@ -1,6 +1,8 @@
 # R packages and code for learning and implementing Markov Chain Monte Carlo methods 
 
 # R package: `metropolis`
+[![Project Status: Active - The project has reached a stable, usable state and is being actively developed.](http://www.repostatus.org/badges/latest/active.svg)](http://www.repostatus.org/#active) [![](http://www.r-pkg.org/badges/version/metropolis)](http://www.r-pkg.org/pkg/metropolis)
+[![CRAN RStudio mirror downloads](http://cranlogs.r-pkg.org/badges/metropolis)](http://www.r-pkg.org/pkg/metropolis) [![Build Status](https://travis-ci.com/alexpkeil1/mcmc.svg?branch=master)](https://travis-ci.com/alexpkeil1/mcmc) [![codecov](https://codecov.io/gh/alexpkeil1/metropolis/branch/master/graph/badge.svg)](https://codecov.io/gh/alexpkeil1/metropolis)
 
     devtools::install_github("alexpkeil1/mcmc", subdir="Rpkg/metropolis", build_vignettes = TRUE)
     library(metropolis)
@@ -15,7 +17,9 @@
     >    1  33   3
 
     summary(glm(y~x, family=binomial(), data=magfields))$coefficients
-    >              Estimate Std. Error   z value     Pr(>|z|)    > (Intercept) -1.766183   0.188373 -9.375988 6.853094e-21    > x            1.255357   0.754200  1.664488 9.601492e-02
+    >              Estimate Std. Error   z value     Pr(>|z|)
+    > (Intercept) -1.766183   0.188373 -9.375988 6.853094e-21
+    > x            1.255357   0.754200  1.664488 9.601492e-02
   
 ## Example: fitting a logistic regression model with uniform priors under two different Metropolis algorithms
 
