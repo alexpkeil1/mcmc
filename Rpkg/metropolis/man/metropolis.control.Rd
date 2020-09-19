@@ -20,17 +20,17 @@ metropolis.control(
 
 \item{adapt.update}{frequency of adaptation}
 
-\item{min.sigma}{minimum of the proposal distribution standard deviation (if set to zero, 
+\item{min.sigma}{minimum of the proposal distribution standard deviation (if set to zero,
 posterior may get stuck)}
 
 \item{prop.sigma.start}{starting value, or fixed value for proposal distribution s
 standard deviation}
 
 \item{scale}{scale value for adaptation (how much should the posterior
-variance estimate be scaled by?). Scale/sqrt(p) is used in metropolis_glm function, and 
+variance estimate be scaled by?). Scale/sqrt(p) is used in metropolis_glm function, and
 Gelman et al. (2014, ISBN: 9781584883883) recommend a scale of 2.4
 @return A list of parameters used in fitting with the following named objects
-  adapt.start, adapt.window,adapt.update,min.sigma,prop.sigma.start,scale}
+adapt.start, adapt.window,adapt.update,min.sigma,prop.sigma.start,scale}
 }
 \description{
 metropolis.control

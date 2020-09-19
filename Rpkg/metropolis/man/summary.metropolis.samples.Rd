@@ -9,20 +9,20 @@
 \arguments{
 \item{object}{an object from the function "metropolis"}
 
-\item{keepburn}{keep the burnin iterations in calculations (if adapt=TRUE, keepburn=TRUE 
+\item{keepburn}{keep the burnin iterations in calculations (if adapt=TRUE, keepburn=TRUE
 will yield potentially invalid summaries)}
 
 \item{...}{not used}
 }
 \value{
 returns a list with the following fields:
-    nsamples: number of simulated samples 
-    sd: standard deviation of parameter distributions 
-    se: standard deviation of parameter distribution means 
-    ESS_parms: effective sample size of parameter distribution means 
-    postmean: posterior means and normal based 95% credible intervals 
-    postmedian: posterior medians and percentile based 95% credible intervals 
-    postmode: posterior modes and highest posterior density based 95% credible intervals
+nsamples: number of simulated samples
+sd: standard deviation of parameter distributions
+se: standard deviation of parameter distribution means
+ESS_parms: effective sample size of parameter distribution means
+postmean: posterior means and normal based 95\% credible intervals
+postmedian: posterior medians and percentile based 95\% credible intervals
+postmode: posterior modes and highest posterior density based 95\% credible intervals
 }
 \description{
 This function allows you to summarize output from the metropolis function.

@@ -27,33 +27,33 @@ metropolis_glm(
 
 \item{data}{an R data frame containing the variables in f}
 
-\item{family}{R glm style family that determines model form: normal() or binomial()}
+\item{family}{R glm style family that determines model form: gaussian() or binomial()}
 
 \item{iter}{number of iterations after burnin to keep}
 
 \item{burnin}{number of iterations at the beginning to throw out (also used for adaptive phase)}
 
-\item{pm}{vector of prior means for normal prior on log(scale) (if applicable) and 
+\item{pm}{vector of prior means for normal prior on log(scale) (if applicable) and
 regression coefficients (set to NULL to use uniform priors)}
 
-\item{pv}{vector of prior variances for normal prior on log(scale) (if applicable) and 
+\item{pv}{vector of prior variances for normal prior on log(scale) (if applicable) and
 regression coefficients (set to NULL to use uniform priors)}
 
-\item{chain}{chain id [plan to deprecate]}
+\item{chain}{chain id (plan to deprecate)}
 
 \item{prop.sigma.start}{proposal distribution standard deviation (starting point if adapt=TRUE)}
 
-\item{inits}{NULL, a vector with length equal to number of parameters (intercept + x + scale 
-[gaussian() family only model only]), or "glm" to set priors based on an MLE fit}
+\item{inits}{NULL, a vector with length equal to number of parameters (intercept + x + scale
+\link{gaussian() family only model only}), or "glm" to set priors based on an MLE fit}
 
 \item{adaptive}{logical, should proposal distribution be adaptive? (TRUE usually gives better answers)}
 
-\item{guided}{logical, should Gustafson's "guided" algorithm be used (TRUE usually gives better answers)}
+\item{guided}{logical, should the "guided" algorithm be used (TRUE usually gives better answers)}
 
-\item{block}{logical or a vector that sums to total number of parameters (e.g. if there are 4 
-random variables in the model, including intercept, then block=c(1,3) will update the 
-intercept separately from the other three parameters.) If TRUE, then updates each parameter 
-1 by 1. Using "guide=TRUE" with blocking=<vector> is not advised}
+\item{block}{logical or a vector that sums to total number of parameters (e.g. if there are 4
+random variables in the model, including intercept, then block=c(1,3) will update the
+intercept separately from the other three parameters.) If TRUE, then updates each parameter
+1 by 1. Using "guide=TRUE" with block=<vector> is not advised}
 
 \item{saveproposal}{(logical, default=FALSE) save the rejected proposals (block=TRUE only)?}
 
@@ -68,13 +68,13 @@ This function carries out the Metropolis algorithm.
 }
 \details{
 Implements the Metropolis algorithm, which allows user specified proposal distributions
- or implements an adaptive algorithm as described by 
- Gelman et al. (2014, ISBN: 9781584883883).
- This function also allows the "Guided" Metropolis algorithm of 
- Gustafson (1998) <doi:10.1023/A:1008880707168>. Note that by default all
- parameters are estimated simulataneously via "block" sampling, but this
- default behavior can be changed with the "block" parameter. When using 
- guided=TRUE, block should be set to FALSE.
+or implements an adaptive algorithm as described by
+Gelman et al. (2014, ISBN: 9781584883883).
+This function also allows the "Guided" Metropolis algorithm of
+Gustafson (1998) \url{doi:10.1023/A:1008880707168}. Note that by default all
+parameters are estimated simulataneously via "block" sampling, but this
+default behavior can be changed with the "block" parameter. When using
+guided=TRUE, block should be set to FALSE.
 }
 \examples{
 dat = data.frame(y = rbinom(100, 1, 0.5), x1=runif(100), x2 = runif(100))

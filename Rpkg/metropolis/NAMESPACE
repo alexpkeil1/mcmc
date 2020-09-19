@@ -2,6 +2,7 @@
 
 S3method(as.mcmc,metropolis.samples)
 S3method(plot,metropolis.samples)
+S3method(print,metropolis.samples)
 S3method(summary,metropolis.samples)
 export(expit)
 export(metropolis.control)

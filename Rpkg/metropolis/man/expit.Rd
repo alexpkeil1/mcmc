@@ -10,8 +10,8 @@ expit(mu)
 \item{mu}{log-odds}
 }
 \value{
-returns a scalar or vector the same length 
-as mu with values that are the inverse logit transform 
+returns a scalar or vector the same length
+as mu with values that are the inverse logit transform
 of mu
 }
 \description{

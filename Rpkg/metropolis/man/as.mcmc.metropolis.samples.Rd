@@ -2,7 +2,7 @@
 % Please edit documentation in R/base.R
 \name{as.mcmc.metropolis.samples}
 \alias{as.mcmc.metropolis.samples}
-\title{Convert glm_metropolis output to `mcmc` object from package coda}
+\title{Convert glm_metropolis output to \code{mcmc} object from package coda}
 \usage{
 \method{as.mcmc}{metropolis.samples}(x, ...)
 }
@@ -15,7 +15,7 @@
 An object of type "mcmc" from the coda package
 }
 \description{
-Allows use of useful functions from `coda` package
+Allows use of useful functions from \code{coda} package
 }
 \details{
 TBA

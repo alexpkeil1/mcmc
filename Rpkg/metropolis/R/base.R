@@ -21,6 +21,7 @@ print.metropolis.samples <- function(x, ...){
   #' @details None 
   #' @param x a "metropolis.samples" object from the function "metropolis_glm"
   #' @param ... not used.
+  #' @export
   #' @return An unmodified "metropolis.samples" object (invisibly)
   fam = x$family$family
   mod = as.character(x$f)
@@ -158,30 +159,6 @@ plot.metropolis.samples <- function(x, keepburn=FALSE, parms=NULL, ...){
 }
 
 
-logistic_ll <- function(y, X, par){
-  #' @title logistic log likelihood
-  #'
-  #' @param y binary outcome 
-  #' @param X design matrix 
-  #' @param par vector of model coefficients 
-  #' @return a scalar quantity proportional to a binomial likelihood
-  #' with logistic parameterization, given y,X,and par
-  sum(dbinom(y, 1, expit(X %*% par), log=TRUE))
-}
-
-normal_ll <- function(y, X, par){
-  #' @title Gaussian log likelihood
-  #'
-  #' @param y binary outcome 
-  #' @param X design matrix 
-  #' @param par vector of gaussian scale parameter followed by model coefficients 
-  #' @return a scalar quantity proportional to a normal likelihood
-  #' with linear parameterization, given y, X, and par
-  beta = par[-1]
-  sig = par[1]
-  sum(dnorm(y, X %*% beta, sig, log=TRUE))
-}
-
 metropolis.control <- function(
   adapt.start = 25,
   adapt.window = 200, 
@@ -227,8 +204,10 @@ calcpost <- function(y,X,par,family, pm, pv){
   if(!is.null(pm)){
     llp = llp + sum(dnorm(par, mean = pm ,sd = sqrt(pv), log=TRUE))
   }
-  # add in Jacobian of transform for linear models
-  if(family$family == "gaussian") llp = llp + exp(par[1])
+  # add in Jacobian of transform for linear models due to transformed scale parameter
+  # posterior*J -> llp + log(J)
+  #if(family$family == "gaussian") llp = llp + exp(par[1])
+  if(family$family == "gaussian") llp = llp + par[1]
   llp
 }
 
@@ -263,23 +242,23 @@ metropolis_glm <- function(
   #'  guided=TRUE, block should be set to FALSE.
   #' @param f an R style formula (e.g. y ~ x1 + x2)
   #' @param data an R data frame containing the variables in f
-  #' @param family R glm style family that determines model form: normal() or binomial()
+  #' @param family R glm style family that determines model form: gaussian() or binomial()
   #' @param iter number of iterations after burnin to keep
   #' @param burnin number of iterations at the beginning to throw out (also used for adaptive phase)
   #' @param pm vector of prior means for normal prior on log(scale) (if applicable) and 
   #' regression coefficients (set to NULL to use uniform priors) 
   #' @param pv vector of prior variances for normal prior on log(scale) (if applicable) and 
   #' regression coefficients (set to NULL to use uniform priors) 
-  #' @param chain chain id [plan to deprecate] 
+  #' @param chain chain id (plan to deprecate)
   #' @param prop.sigma.start proposal distribution standard deviation (starting point if adapt=TRUE) 
   #' @param inits NULL, a vector with length equal to number of parameters (intercept + x + scale 
   #' [gaussian() family only model only]), or "glm" to set priors based on an MLE fit
   #' @param adaptive logical, should proposal distribution be adaptive? (TRUE usually gives better answers)
-  #' @param guided logical, should Gustafson's "guided" algorithm be used (TRUE usually gives better answers)
+  #' @param guided logical, should the "guided" algorithm be used (TRUE usually gives better answers)
   #' @param block logical or a vector that sums to total number of parameters (e.g. if there are 4 
   #' random variables in the model, including intercept, then block=c(1,3) will update the 
   #' intercept separately from the other three parameters.) If TRUE, then updates each parameter 
-  #' 1 by 1. Using "guide=TRUE" with blocking=<vector> is not advised
+  #' 1 by 1. Using "guide=TRUE" with block=<vector> is not advised
   #' @param saveproposal (logical, default=FALSE) save the rejected proposals (block=TRUE only)?
   #' @param control parameters that control fitting algorithm. See metropolis.control()
   #' @return An object of type "metropolis.samples" which is a named list containing posterior
