@@ -44,7 +44,7 @@ regression coefficients (set to NULL to use uniform priors)}
 \item{prop.sigma.start}{proposal distribution standard deviation (starting point if adapt=TRUE)}
 
 \item{inits}{NULL, a vector with length equal to number of parameters (intercept + x + scale
-\link{gaussian() family only model only}), or "glm" to set priors based on an MLE fit}
+;gaussian() family only model only), or "glm" to set priors based on an MLE fit}
 
 \item{adaptive}{logical, should proposal distribution be adaptive? (TRUE usually gives better answers)}
 
@@ -53,7 +53,7 @@ regression coefficients (set to NULL to use uniform priors)}
 \item{block}{logical or a vector that sums to total number of parameters (e.g. if there are 4
 random variables in the model, including intercept, then block=c(1,3) will update the
 intercept separately from the other three parameters.) If TRUE, then updates each parameter
-1 by 1. Using "guide=TRUE" with block=<vector> is not advised}
+1 by 1. Using \code{guide}=TRUE with \code{block} as a vector is not advised}
 
 \item{saveproposal}{(logical, default=FALSE) save the rejected proposals (block=TRUE only)?}
 
@@ -71,7 +71,7 @@ Implements the Metropolis algorithm, which allows user specified proposal distri
 or implements an adaptive algorithm as described by
 Gelman et al. (2014, ISBN: 9781584883883).
 This function also allows the "Guided" Metropolis algorithm of
-Gustafson (1998) \url{doi:10.1023/A:1008880707168}. Note that by default all
+Gustafson (1998) \doi{doi:10.1023/A:1008880707168}. Note that by default all
 parameters are estimated simulataneously via "block" sampling, but this
 default behavior can be changed with the "block" parameter. When using
 guided=TRUE, block should be set to FALSE.

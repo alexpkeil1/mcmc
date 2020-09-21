@@ -1,18 +1,4 @@
-expit <- function(mu){
-  #' @title Inverse logit transform
-  #'
-  #' @param mu log-odds
-  #' @return returns a scalar or vector the same length 
-  #' as mu with values that are the inverse logit transform 
-  #' of mu 
-  #' @export
-  #' @examples
-  #' logodds = rnorm(10)
-  #' expit(logodds)
-  #' logodds = log(1.0)
-  #' expit(logodds)
-  1/(1+exp(-mu))
-}
+
 
 print.metropolis.samples <- function(x, ...){
   #' @title Print a metropolis.samples object
@@ -212,6 +198,228 @@ calcpost <- function(y,X,par,family, pm, pv){
 }
 
 
+.metropolis_glm <- function(
+  f, 
+  data,
+  family=binomial(),
+  iter=100, 
+  burnin=round(iter/2), 
+  pm=NULL, 
+  pv=NULL, 
+  chain=1, 
+  prop.sigma.start=.1, 
+  inits=NULL, 
+  adaptive=TRUE, 
+  guided=FALSE, 
+  block=TRUE,
+  saveproposal=FALSE,
+  control = metropolis.control()
+) {
+  
+  # error catching 
+  if (is.character(family)) 
+    family <- get(family, mode = "function", envir = parent.frame())
+  if (is.function(family)) 
+    family <- family()
+  if (is.null(family$family)) {
+    stop("'family' not recognized")
+  }
+  if (!(family$family %in% c("gaussian", "binomial"))) {
+    stop("only 'gaussian' and 'binomial' families are currently implemented")
+  }
+  if(length(block)>1 & guided){
+    warning("Block sampling with 'guided=TRUE' is not advised, unless block=TRUE")
+  }
+  # collect some info on data
+  X = model.matrix(f, data = data)
+  mterm = terms(f)
+  outcol = as.character(attr(mterm, "variables")[[2]])
+  y = data[,outcol]
+  
+  ###########3
+  p = dim(X)[2] # number of parameters
+  if(family$family == "gaussian"){
+    p = p+1 # scale parameter
+  }
+  # create empty matrixes/vectors for posterior estimates
+  accept <- parms <- matrix(nrow=iter+burnin, ncol=p)
+  lpost <- numeric(iter+burnin)
+  proposals = NULL
+  # generate initial values
+  if(is.null(inits)){
+    inits = c(beta=runif(p)*4-2)
+  } 
+  if(length(inits)==1 && inits=="glm"){
+    mlefit = glm(f, family=family, data)
+    inits = as.numeric(mlefit$coefficients)
+    if(family$family == "gaussian") inits = c(logscale=log(sd(mlefit$residuals)), beta=inits)
+  }
+  parms[1,] <- inits
+  lpost[1] <- calcpost(y,X,inits,family, pm, pv)  
+  if(saveproposal & length(block)==1 && block) proposals = parms
+  if(length(control$prop.sigma.start)==1){
+    cov = rep(control$prop.sigma.start, p)
+  }else{
+    cov = control$prop.sigma.start
+  }
+  
+  accept[1,] = rep(1, p)
+  if(!adaptive) control$adapt.start = iter+1+burnin
+  # guiding direction
+  if(length(block)==1 && block) dir = 1
+  if(length(block)>1) dir = rep(1, length(block))
+  if(length(block)==1 && !block) dir = rep(1, p)
+  # run metropolis algorithmm
+  for(i in 2:(iter+burnin)){
+    #if adaptive, then adapt while in the adaptation phase
+    if((i>=control$adapt.start  & !(i%%control$adapt.update) & i<=burnin)){
+      cov <- control$scale/sqrt(p)*apply(parms, 2, sd, na.rm=TRUE)
+    }
+    b.prv = parms[i-1,]
+    b.cand = b.prv
+    if(length(block)==1 && block){
+      # block update all parameters
+      # non-normalized log-probability at previous beta
+      llp = calcpost(y,X,b.prv,family, pm, pv)        
+      # draw candidate value from proposal distribution
+      z = rnorm(p,0, cov) 
+      if(guided) z = abs(z) * dir
+      b.cand = b.cand + z
+      if(saveproposal) proposals[i,] = b.cand
+      
+      # non-normalized log-probability at candidate beta
+      lp = calcpost(y,X,b.cand,family, pm, pv)        
+      # accept/reject candidate value
+      accept.prob = exp(lp-llp) # acceptance probability
+      a = (accept.prob > runif(1))
+      if(is.nan(a)) stop("Acceptance probability is NaN, indicating a problem with the chain. 
+                           If using adapt=TRUE, try changing some of the adaptation parameters 
+                           in 'control' (see help file for metropolis.control and metropolis_glm)")
+      if(!a){
+        b.cand = b.cand - z
+        dir = dir
+      }
+      #lpost[i] <- ifelse(a, lp, llp)
+      accept[i,] = a
+    } else{ # partial blocks, or update 1 by 1
+      # loop over parameters
+      if(length(block)>1) blocks=block else blocks = rep(1,p)
+      st = cumsum(c(1, blocks))
+      end = cumsum(c(blocks, 1))
+      blocklist = list()
+      for(idx in 1:length(st[-1])){
+        blocklist[[idx]] = st[idx]:end[idx]
+      }
+      for(q in blocklist){ # loop over blocks
+        # non-normalized log-probability at previous beta
+        llp = calcpost(y,X,b.prv,family, pm, pv)        
+        # draw candidate value from proposal distribution
+        z = rep(0, p)
+        z[q] = rnorm(length(q),0, cov[q]) 
+        if(guided) z = abs(z) * dir
+        b.cand = b.cand + z
+        # non-normalized log-probability at candidate beta
+        lp = calcpost(y,X,b.cand,family, pm, pv)        
+        # accept/reject candidate value
+        accept.prob = exp(lp-llp) # acceptance probability
+        a = (accept.prob > runif(1))
+        if(is.nan(a)) stop("Acceptance probability is NaN, indicating a problem with the chain. 
+                           If using adapt=TRUE, try changing some of the adaptation parameters 
+                           in 'control' (see help file for metropolis.control and metropolis_glm)")
+        if(!a){
+          b.cand = b.cand - z
+          dir[q] = -dir[q]
+        }
+        b.prv[q] = b.cand[q]
+        accept[i,q] = a
+      }# end loop over blocks
+    } # end partial blocks, or update 1 by 1
+    lpost[i] <- ifelse(a, lp, llp)
+    parms[i,] = b.cand
+  } #loop over i
+  bt = data.frame(parms)
+  if(family$family=="binomial") nm = paste0('b_', 0:(p-1), '')
+  if(family$family=="gaussian") nm = c("logsigma", paste0('b_', 0:(p-2), ''))
+  names(bt) <- nm
+  bt$iter = 1:dim(bt)[1]
+  bt$burn = 1.0*(bt$iter<=burnin)
+  bt <- bt[,c('iter', 'burn', grep('logsigma|b_', names(bt), value = TRUE, fixed=FALSE))]
+  # output an R list with posterior samples, acceptance rate, and covariance of proposal distribution
+  res = list(parms = bt, 
+             accept=accept,
+             lpost=lpost,
+             cov=cov, 
+             iter=iter, 
+             burnin=burnin, 
+             f=f, 
+             family=family, 
+             dimnames = colnames(X), 
+             guided=guided,
+             adaptive = adaptive,
+             priors = ifelse(is.null(pm), "uniform", "normal"),
+             pm = pm,
+             pv = pv,
+             inits = inits,
+             proposals = proposals,
+             adaptive = adaptive,
+             guided=guided,
+             block=block
+  )
+  class(res) <- "metropolis.samples"
+  res
+}
+
+#' @title Use the Metropolis Hastings algorithm to estimate Bayesian glm parameters
+#'
+#' @description This function carries out the Metropolis algorithm.
+#' @details Implements the Metropolis algorithm, which allows user specified proposal distributions
+#'  or implements an adaptive algorithm as described by 
+#'  Gelman et al. (2014, ISBN: 9781584883883).
+#'  This function also allows the "Guided" Metropolis algorithm of 
+#'  Gustafson (1998) \doi{doi:10.1023/A:1008880707168}. Note that by default all
+#'  parameters are estimated simulataneously via "block" sampling, but this
+#'  default behavior can be changed with the "block" parameter. When using 
+#'  guided=TRUE, block should be set to FALSE.
+#' @param f an R style formula (e.g. y ~ x1 + x2)
+#' @param data an R data frame containing the variables in f
+#' @param family R glm style family that determines model form: gaussian() or binomial()
+#' @param iter number of iterations after burnin to keep
+#' @param burnin number of iterations at the beginning to throw out (also used for adaptive phase)
+#' @param pm vector of prior means for normal prior on log(scale) (if applicable) and 
+#' regression coefficients (set to NULL to use uniform priors) 
+#' @param pv vector of prior variances for normal prior on log(scale) (if applicable) and 
+#' regression coefficients (set to NULL to use uniform priors) 
+#' @param chain chain id (plan to deprecate)
+#' @param prop.sigma.start proposal distribution standard deviation (starting point if adapt=TRUE) 
+#' @param inits NULL, a vector with length equal to number of parameters (intercept + x + scale 
+#' ;gaussian() family only model only), or "glm" to set priors based on an MLE fit
+#' @param adaptive logical, should proposal distribution be adaptive? (TRUE usually gives better answers)
+#' @param guided logical, should the "guided" algorithm be used (TRUE usually gives better answers)
+#' @param block logical or a vector that sums to total number of parameters (e.g. if there are 4 
+#' random variables in the model, including intercept, then block=c(1,3) will update the 
+#' intercept separately from the other three parameters.) If TRUE, then updates each parameter 
+#' 1 by 1. Using `guide`=TRUE with `block` as a vector is not advised
+#' @param saveproposal (logical, default=FALSE) save the rejected proposals (block=TRUE only)?
+#' @param control parameters that control fitting algorithm. See metropolis.control()
+#' @return An object of type "metropolis.samples" which is a named list containing posterior
+#' MCMC samples as well as some fitting information.
+#' @import stats
+#' @export
+#' @examples
+#' dat = data.frame(y = rbinom(100, 1, 0.5), x1=runif(100), x2 = runif(100))
+#' \donttest{
+#' res = metropolis_glm(y ~ x1 + x2, data=dat, family=binomial(), iter=1000, burnin=3000, 
+#' adapt=TRUE, guided=TRUE, block=FALSE)
+#' res
+#' summary(res)
+#' apply(res$parms, 2, mean)}
+#' glm(y ~ x1 + x2, family=binomial(), data=dat)
+#' dat = data.frame(y = rnorm(100, 1, 0.5), x1=runif(100), x2 = runif(100), x3 = rpois(100, .2))
+#' \donttest{
+#' res = metropolis_glm(y ~ x1 + x2 + factor(x3), data=dat, family=gaussian(), inits="glm", 
+#' iter=10000, burnin=3000, adapt=TRUE, guide=TRUE, block=FALSE)
+#' apply(res$parms, 2, mean)
+#' glm(y ~ x1 + x2+ factor(x3), family=gaussian(), data=dat)}
 metropolis_glm <- function(
                        f, 
                        data,
@@ -229,57 +437,7 @@ metropolis_glm <- function(
                        saveproposal=FALSE,
                        control = metropolis.control()
                        ) {
-  #' @title Use the Metropolis Hastings algorithm to estimate Bayesian glm parameters
-  #'
-  #' @description This function carries out the Metropolis algorithm.
-  #' @details Implements the Metropolis algorithm, which allows user specified proposal distributions
-  #'  or implements an adaptive algorithm as described by 
-  #'  Gelman et al. (2014, ISBN: 9781584883883).
-  #'  This function also allows the "Guided" Metropolis algorithm of 
-  #'  Gustafson (1998) <doi:10.1023/A:1008880707168>. Note that by default all
-  #'  parameters are estimated simulataneously via "block" sampling, but this
-  #'  default behavior can be changed with the "block" parameter. When using 
-  #'  guided=TRUE, block should be set to FALSE.
-  #' @param f an R style formula (e.g. y ~ x1 + x2)
-  #' @param data an R data frame containing the variables in f
-  #' @param family R glm style family that determines model form: gaussian() or binomial()
-  #' @param iter number of iterations after burnin to keep
-  #' @param burnin number of iterations at the beginning to throw out (also used for adaptive phase)
-  #' @param pm vector of prior means for normal prior on log(scale) (if applicable) and 
-  #' regression coefficients (set to NULL to use uniform priors) 
-  #' @param pv vector of prior variances for normal prior on log(scale) (if applicable) and 
-  #' regression coefficients (set to NULL to use uniform priors) 
-  #' @param chain chain id (plan to deprecate)
-  #' @param prop.sigma.start proposal distribution standard deviation (starting point if adapt=TRUE) 
-  #' @param inits NULL, a vector with length equal to number of parameters (intercept + x + scale 
-  #' [gaussian() family only model only]), or "glm" to set priors based on an MLE fit
-  #' @param adaptive logical, should proposal distribution be adaptive? (TRUE usually gives better answers)
-  #' @param guided logical, should the "guided" algorithm be used (TRUE usually gives better answers)
-  #' @param block logical or a vector that sums to total number of parameters (e.g. if there are 4 
-  #' random variables in the model, including intercept, then block=c(1,3) will update the 
-  #' intercept separately from the other three parameters.) If TRUE, then updates each parameter 
-  #' 1 by 1. Using "guide=TRUE" with block=<vector> is not advised
-  #' @param saveproposal (logical, default=FALSE) save the rejected proposals (block=TRUE only)?
-  #' @param control parameters that control fitting algorithm. See metropolis.control()
-  #' @return An object of type "metropolis.samples" which is a named list containing posterior
-  #' MCMC samples as well as some fitting information.
-  #' @import stats
-  #' @export
-  #' @examples
-  #' dat = data.frame(y = rbinom(100, 1, 0.5), x1=runif(100), x2 = runif(100))
-  #' \donttest{
-  #' res = metropolis_glm(y ~ x1 + x2, data=dat, family=binomial(), iter=1000, burnin=3000, 
-  #' adapt=TRUE, guided=TRUE, block=FALSE)
-  #' res
-  #' summary(res)
-  #' apply(res$parms, 2, mean)}
-  #' glm(y ~ x1 + x2, family=binomial(), data=dat)
-  #' dat = data.frame(y = rnorm(100, 1, 0.5), x1=runif(100), x2 = runif(100), x3 = rpois(100, .2))
-  #' \donttest{
-  #' res = metropolis_glm(y ~ x1 + x2 + factor(x3), data=dat, family=gaussian(), inits="glm", 
-  #' iter=10000, burnin=3000, adapt=TRUE, guide=TRUE, block=FALSE)
-  #' apply(res$parms, 2, mean)
-  #' glm(y ~ x1 + x2+ factor(x3), family=gaussian(), data=dat)}
+
   # error catching 
   if (is.character(family)) 
     family <- get(family, mode = "function", envir = parent.frame())
@@ -458,29 +616,3 @@ metropolis_glm <- function(
 # }
 
 
-# coda object
-as.mcmc.metropolis.samples <- function(x, ...){
-  #' @title Convert glm_metropolis output to `mcmc` object from package coda
-  #'
-  #' @description Allows use of useful functions from `coda` package
-  #' @details TBA
-  #' @param x an object from the function "metropolis"
-  #' @param ... not used
-  #' @return An object of type "mcmc" from the coda package
-  #' @importFrom coda mcmc as.mcmc
-  #' @export
-  #' @method as.mcmc metropolis.samples
-  #' @examples
-  #' library("coda")
-  #' dat = data.frame(y = rbinom(100, 1, 0.5), x1=runif(100), x2 = runif(100))
-  #' res = metropolis_glm(y ~ x1 + x2, data=dat, family=binomial(), iter=10000, burnin=3000, 
-  #' adapt=TRUE, guided=TRUE, block=FALSE)
-  #' res2 = as.mcmc(res)
-  #' summary(res2)
-  samples = x$parms[x$parms$burn==0,grep('logsigma|b_', names(x$parms), value = TRUE, fixed=FALSE)]
-  mcmc(data= samples, 
-       start =  x$burnin, 
-       end = x$iter,
-       thin = 1)
-  
-}

@@ -1,11 +1,11 @@
 # metropolis 
 
-# v0.1.6
+# v0.1.8
 ## Major changes
-- N/A
+- Better error handling in likelihood functions
 
 ## Bug fixes
-- Fixed bug in log-Jacobian calculation for gaussian model
+- Fixed bug in log-Jacobian calculation for Gaussian model
 
 # v0.1.5
 ## Major changes

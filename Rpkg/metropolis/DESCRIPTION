@@ -1,7 +1,7 @@
 Package: metropolis
 Title: The Metropolis Algorithm
-Version: 0.1.6
-Date: 2020-09-19
+Version: 0.1.8
+Date: 2020-09-21
 Authors@R: 
     person(given = "Alexander",
            family = "Keil",
@@ -17,7 +17,7 @@ Description: Learning and using the Metropolis algorithm for
     generalized linear model parameters using guided, adaptive,
     guided-adaptive and random walk Metropolis algorithms. The random walk
     Metropolis algorithm was originally described in Metropolis et al
-    (1953) <doi:10.1063/1.1699114>.
+    (1953); <doi:10.1063/1.1699114>.
 License: GPL (>= 2)
 Depends: 
     coda,
@@ -25,7 +25,8 @@ Depends:
 Imports: 
     stats
 Suggests: 
-    knitr
+    knitr,
+    markdown
 VignetteBuilder: 
     knitr
 Encoding: UTF-8

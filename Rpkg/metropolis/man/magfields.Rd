@@ -3,7 +3,7 @@
 \docType{data}
 \name{magfields}
 \alias{magfields}
-\title{A case control study of childhood leukemia and magnetic fields from Savitz, Wachtel, Barnes, et al (1998) \url{doi:10.1093/oxfordjournals.aje.a114943}}
+\title{A case control study of childhood leukemia and magnetic fields from Savitz, Wachtel, Barnes, et al (1998) \doi{doi:10.1093/oxfordjournals.aje.a114943}.}
 \format{
 A data frame with 234 rows and 2 variables:
 \describe{
@@ -15,6 +15,6 @@ A data frame with 234 rows and 2 variables:
 magfields
 }
 \description{
-A case control study of childhood leukemia and magnetic fields from Savitz, Wachtel, Barnes, et al (1998) \url{doi:10.1093/oxfordjournals.aje.a114943}
+A case control study of childhood leukemia and magnetic fields from Savitz, Wachtel, Barnes, et al (1998) \doi{doi:10.1093/oxfordjournals.aje.a114943}.
 }
 \keyword{datasets}
