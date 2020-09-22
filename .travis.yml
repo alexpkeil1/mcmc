@@ -6,7 +6,6 @@ r:
   - release
 
 os:
-  - linux
   - osx
 
 r_packages:
