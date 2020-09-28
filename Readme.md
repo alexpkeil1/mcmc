@@ -5,6 +5,9 @@
 
 A package to carry out Bayesian GLMs with independent priors via the Metropolis algorithm
 
+
+
+
 [`GibbsSamplers` julia functions](julia/GibbsSamplers/README.md)
 
 A set of functions to carry out Bayesian GLMs via the Gibbs sampling under various prior schemes (variable selection and shrinkage)
