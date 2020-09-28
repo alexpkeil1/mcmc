@@ -66,9 +66,9 @@
     
     plot(res.rw, par = 1:2, keepburn=TRUE)
 
-![RW1](fig/random_walkb0.png)
+![RW1](inst/fig/random_walkb0.png)
 
-![RW2](fig/random_walkb1.png)
+![RW2](inst/fig/random_walkb1.png)
 
 ### Guided, adaptive random walk Metropolis
     res.ga = metropolis_glm(y ~ x, data=magfields, family=binomial(), iter=20000, 
@@ -106,6 +106,6 @@
     > x            1.260855 -3.812090  2.458669
     plot(res.ga, par = 1:2, keepburn=TRUE)
 
-![AG1](fig/adaptive_guidedb0.png)
+![AG1](inst/fig/adaptive_guidedb0.png)
 
-![AG2](fig/adaptive_guidedb1.png)
+![AG2](inst/fig/adaptive_guidedb1.png)
