@@ -136,7 +136,7 @@ using Distributions, DataFrames, GLM, StatsBase, LinearAlgebra
 #    _py_store[i,:] = vcat(cm1, cm0, md)
 #  end
 #  df = convert(DataFrame, hcat([chain for i in 1:iter], [i for i in 1:iter], _py_store, _beta_store, _lamsq_store, _tausq_store, _sigma_store))
-#  rename!(df, vcat(
+#  names!(df, vcat(
 #       :chain, :iter,
 #       :m1, :m0, :md,
 #     [Symbol("beta" * "[$i]") for i in 0:(p)],
@@ -345,7 +345,7 @@ function gibbs_horseshoelm(y,X,Xint,iter,burnin,rng; chain=1,
     nms = vcat(nms, [Symbol("betau" * "[$i]") for i in 0:p])
   end
   df = convert(DataFrame, rr)
-  rename!(df, nms)
+  names!(df, nms)
   df[(burnin+1):iter,:]
 end
 

@@ -234,7 +234,7 @@ function calcmd!(munc, muint, ymean, yscale, Xint, _beta)
   cm1, cm0, md
 end
 
-function gibbs_lm(y,X,Xint,iter,burnin,rng; binits=NaN,
+function gibbs_lm(y,X,Xint,iter,burnin,rng; chain=1, binits=NaN,
                offset = 0.0,
                _mu_eta0 = 0., _tau_eta0 = 1000.,                              # prior mean, sd of intercept
                _mu_beta0 = 0., _tau_beta0 = 1000.,                              # prior mean, sd of intercept
@@ -285,17 +285,20 @@ function gibbs_lm(y,X,Xint,iter,burnin,rng; binits=NaN,
   end
     _sig_store = sqrt.(inv.(_sig_store))
   # this should be new template
-  rr = hcat(_py_store, _beta_store, _sig_store)
-  nms = vcat(:m1, :m0, :md, [Symbol("beta" * "[$i]") for i in 0:p],
+  rr = hcat([chain for i in 1:iter], [i for i in 1:iter], 
+             _py_store, _beta_store, _sig_store)
+  nms = vcat(:chain, :iter, :m1, :m0, :md, [Symbol("beta_$i") for i in 0:p],
                   :sigma)
   if !isapprox(yscale, 1.0)
     _beta_ustd = _beta_store .* yscale
     _beta_ustd[:,1] .+= ymean
     rr = hcat(rr, _beta_ustd)
-    nms = vcat(nms, [Symbol("betau" * "[$i]") for i in 0:p])
+    nms = vcat(nms, [Symbol("betau_$i") for i in 0:p])
   end
   df = convert(DataFrame, rr)
-  rename!(df, nms)
+  #exnm = names(df)
+  #renamer = Dict([exnm[i] => nms[i] for i in 1:length(exnm)])
+  names!(df, nms)
   df[(burnin+1):iter,:]
 end
 
@@ -395,7 +398,7 @@ function gibbs_hlm(y,X,Xint,iter,burnin,rng; chain = 1, binits=NaN,
     _beta_store, _py_store,
     _sig_store
   ) = inits(y,X,Xint,iter,_mu_eta0,_tau_eta0,0.0,rand(rng)*2.0, _sigmaa0, binits, pl)
-  
+  println(j)
   # hierarchy not yet implemented
   #j = size(pl, 1)
   #pls = vcat(1, (cumsum(pl) .+ 1)[1:(end-1)])
@@ -438,16 +441,18 @@ function gibbs_hlm(y,X,Xint,iter,burnin,rng; chain = 1, binits=NaN,
     _sig_store = sqrt.(inv.(_sig_store))
   # this should be new template
   rr = hcat([chain for i in 1:iter], [i for i in 1:iter], _py_store, _beta_store, _mu_store, _tausq_store, _sig_store)
-  nms = vcat(:chain, :iter, :m1, :m0, :md, [Symbol("beta" * "[$i]") for i in 0:p], [Symbol("mu" * "[$i]") for i in 1:j], [Symbol("tausq" * "[$i]") for i in 1:j],
+  nms = vcat(:chain, :iter, :m1, :m0, :md, [Symbol("beta_$i") for i in 0:p], [Symbol("mu_$i") for i in 1:j], [Symbol("tausq_$i") for i in 1:j],
                   :sigma)
   if !isapprox(yscale, 1.0)
     _beta_ustd = _beta_store .* yscale
     _beta_ustd[:,1] .+= ymean
     rr = hcat(rr, _beta_ustd)
-    nms = vcat(nms, [Symbol("betau" * "[$i]") for i in 0:p])
+    nms = vcat(nms, [Symbol("betau_$i") for i in 0:p])
   end
   df = convert(DataFrame, rr)
-  rename!(df, nms)
+  exnm = names(df)
+  renamer = Dict([exnm[i] => nms[i] for i in 1:length(exnm)])
+  rename!(df, renamer)
   df[(burnin+1):iter,:]
 end
 

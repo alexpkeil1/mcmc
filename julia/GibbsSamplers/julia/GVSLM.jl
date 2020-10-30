@@ -16,7 +16,7 @@ function inputchecks(y,X,Xint,p, pl)
   @assert sum(pl) == p "sum(pl) should equal number of columns of X (without intercept)"
 end
 
-function inits(rng, pl,iter,binit, X, Xint, _tau_eta0, _mu_tau0, _mu_eta0, _mu_mu0, _sigmaa0, pa, pb)
+function inits(rng, pl,iter,binits,y, X, Xint, _tau_eta0, _mu_tau0, _mu_eta0, _mu_mu0, _sigmaa0, pa, pb)
   # indexes
   (N,p) = size(X)
   j = size(pl, 1)
@@ -28,10 +28,10 @@ function inits(rng, pl,iter,binit, X, Xint, _tau_eta0, _mu_tau0, _mu_eta0, _mu_m
   # parameters
   _pi = rand.(rng, Beta.(pa,pb))
   _invsigma2 = rand()
-  if size(binit, 1)==1 && isnan(binit)
+  if size(binits, 1)==1 && isnan(binits)
     _beta = randn(rng, p+1)*2
   else
-    _beta::Array{Float64, 1} = copy(binit) # if drawn from coef(glmfit), this can actually change the coefficients without copy()
+    _beta::Array{Float64, 1} = copy(binits) # if drawn from coef(glmfit), this can actually change the coefficients without copy()
   end
   # todo check length of mu/tau
   # draw initial selection from prior
@@ -369,7 +369,7 @@ function gvs_lm(y, X, Xint, pl::Array{Int64,1}, iter::Int64, burnin::Int64, rng;
                _mu_mu0 = 0., _mu_tau0 = 1.0,                                # prior mean, sd of mu_l (beta means) (assumed constant over all beta)
                _sigmaa0 = 0.0, _sigmab0 = 5.0,                              # limit of uniform for prior shape scale of sigma^2 (model error term variance)
                pa = [1.0, 1.0], pb=[1.0, 1.0],
-               binit = NaN,
+               binits = NaN,
                ymean = 1.0, # rescaling coefficients
                yscale = 1.0 # rescaling coefficients
                )
@@ -383,7 +383,7 @@ function gvs_lm(y, X, Xint, pl::Array{Int64,1}, iter::Int64, burnin::Int64, rng;
     Nu, Nuj, X, Xs, Xst, xstx, munc, muint, _iLams, _muvec, res, bres,
     _A_ms, _A, a, yr
   ) =
-  inits(rng, pl,iter,binit, X, Xint, _tau_eta0, _mu_tau0, _mu_eta0, _mu_mu0, _sigmaa0, pa, pb)
+  inits(rng, pl,iter,binits,y, X, Xint, _tau_eta0, _mu_tau0, _mu_eta0, _mu_mu0, _sigmaa0, pa, pb)
   nu = 1.0
   ####################
   # update loop
@@ -429,10 +429,10 @@ function gvs_lm(y, X, Xint, pl::Array{Int64,1}, iter::Int64, burnin::Int64, rng;
   nms = vcat(
        :chain, :iter,
        :m1, :m0, :md,
-     [Symbol("beta" * "[$i]") for i in 0:p],
-     [Symbol("gamma" * "[$i]") for i in 1:p],
-     [Symbol("b*g" * "[$i]") for i in 1:p],
-     [Symbol("pi" * "[$i]") for i in 1:j],
+     [Symbol("beta_$i") for i in 0:p],
+     [Symbol("gamma_$i") for i in 1:p],
+     [Symbol("bxg_$i") for i in 1:p],
+     [Symbol("pi_$i") for i in 1:j],
      :sigma
      )
   if !isapprox(yscale, 1.0)
@@ -442,7 +442,7 @@ function gvs_lm(y, X, Xint, pl::Array{Int64,1}, iter::Int64, burnin::Int64, rng;
     nms = vcat(nms, [Symbol("b*gu" * "[$i]") for i in 0:p])
   end
   df = convert(DataFrame, rr)
-  rename!(df, nms)
+  names!(df, nms)
   df[range(burnin+1, iter, step=thin),:]
 end
 gvs_lm(y,X,Xint,pl::Array{Int64,1}, iter::Int64, burnin::Int64;thin=1,chain=1) = gvs_lm(y,X,Xint,pl,  iter, burnin, MersenneTwister(convert(Int, rand([i for i in 1:1e6])));thin=thin,chain=chain)
@@ -457,7 +457,7 @@ function gvs_hlm(y, X, Xint, pl::Array{Int64,1}, iter::Int64, burnin::Int64, rng
                _tau_mu0 = [0.0], _tau_tau0 = [25.0],          # prior center, scale of half-t/half-cauchy (_tau_mu0 is unused)
                _sigmaa0 = 0.0, _sigmab0 = 5.0,                              # limit of uniform for prior shape scale of sigma^2 (model error term variance)
                pa = [1.0], pb=[1.0],                              # prior beta(a,b) parameters for pi (group selection priors)
-               binit = NaN,
+               binits = NaN,
                nu = 1.0,
                ymean = 1.0, # rescaling coefficients
                yscale = 1.0, # rescaling coefficients
@@ -474,7 +474,7 @@ function gvs_hlm(y, X, Xint, pl::Array{Int64,1}, iter::Int64, burnin::Int64, rng
     Nu, Nuj, X, Xs, Xst, xstx, munc, muint, _iLams, _muvec, res, bres,
     _A_ms, _A, a, yr
   ) =
-  inits(rng, pl,iter,binit, X, Xint, _tau_eta0, _mu_tau0, _mu_eta0, _mu_mu0, _sigmaa0, pa, pb)
+  inits(rng, pl,iter,binits,y, X, Xint, _tau_eta0, _mu_tau0, _mu_eta0, _mu_mu0, _sigmaa0, pa, pb)
   # hierarchical specific
   _alpha = rand(rng)*2
   _v_store = zeros(iter, j)
@@ -549,10 +549,10 @@ function gvs_hlm(y, X, Xint, pl::Array{Int64,1}, iter::Int64, burnin::Int64, rng
   nms = vcat(
        :chain, :iter,
        :m1, :m0, :md,
-     [Symbol("beta" * "[$i]") for i in 0:p],
-     [Symbol("gamma" * "[$i]") for i in 1:p],
-     [Symbol("b*g" * "[$i]") for i in 1:p],
-     [Symbol("pi" * "[$i]") for i in 1:j],
+     [Symbol("beta_$i") for i in 0:p],
+     [Symbol("gamma_$i") for i in 1:p],
+     [Symbol("bxg_$i") for i in 1:p],
+     [Symbol("pi_$i") for i in 1:j],
      [Symbol("mu" * "[$i]") for i in 1:j],
      [Symbol("tau" * "[$i]") for i in 1:j],
      [Symbol("V" * "[$i]") for i in 1:j],
@@ -566,7 +566,7 @@ function gvs_hlm(y, X, Xint, pl::Array{Int64,1}, iter::Int64, burnin::Int64, rng
     nms = vcat(nms, [Symbol("b*gu" * "[$i]") for i in 0:p])
   end
   df = convert(DataFrame, rr)
-  rename!(df, nms)
+  names!(df, nms)
   df[range(burnin+1, iter, step=thin),:]
 
 end
@@ -583,7 +583,7 @@ function gvs_zlm(y, X, Xint, pl::Array{Int64,1}, iter::Int64, burnin::Int64, rng
                _sigmaa0 = 0.0, _sigmab0 = 5.0,                              # limit of uniform for prior shape scale of sigma^2 (model error term variance)
                pa = [1.0, 1.0], pb=[1.0, 1.0],
                G=6889.,                                                     # the g prior
-               binit = NaN,
+               binits = NaN,
                ymean = 1.0, # rescaling coefficients
                yscale = 1.0 # rescaling coefficients
                )
@@ -597,7 +597,7 @@ function gvs_zlm(y, X, Xint, pl::Array{Int64,1}, iter::Int64, burnin::Int64, rng
     Nu, Nuj, X, Xs, Xst, xstx, munc, muint, _iLams, _muvec, res, bres,
     _A_ms, _A, a, yr
   ) =
-  inits(rng, pl,iter,binit, X, Xint, _tau_eta0, _mu_tau0, _mu_eta0, _mu_mu0, _sigmaa0, pa, pb)
+  inits(rng, pl,iter,binits,y, X, Xint, _tau_eta0, _mu_tau0, _mu_eta0, _mu_mu0, _sigmaa0, pa, pb)
   # zellner specific 
   _iLams = diagm(vcat( _tau_eta0[1]^(-2), [ _mu_tau0[1]^(-2) for j in 1:p])) # this gets overwritten except row/col 1
   xtx = transpose(X)*X
@@ -648,8 +648,8 @@ function gvs_zlm(y, X, Xint, pl::Array{Int64,1}, iter::Int64, burnin::Int64, rng
                                 _beta_store, _gamma_store, _bg_store, _pi_store, _sigma_store)
   nms = vcat(
        :chain, :iter, :m1, :m0, :md,
-     [Symbol("beta" * "[$i]") for i in 0:p], [Symbol("gamma" * "[$i]") for i in 1:p],
-     [Symbol("b*g" * "[$i]") for i in 1:p], [Symbol("pi" * "[$i]") for i in 1:j],
+     [Symbol("beta_$i") for i in 0:p], [Symbol("gamma_$i") for i in 1:p],
+     [Symbol("bxg_$i") for i in 1:p], [Symbol("pi_$i") for i in 1:j],
      :sigma
      )                              
   if !isapprox(yscale, 1.0)
@@ -659,7 +659,7 @@ function gvs_zlm(y, X, Xint, pl::Array{Int64,1}, iter::Int64, burnin::Int64, rng
     nms = vcat(nms, [Symbol("b*gu" * "[$i]") for i in 0:p])
   end
   df = convert(DataFrame, rr)
-  rename!(df, nms)
+  names!(df, nms)
   df[range(burnin+1, iter, step=thin),:]
 end
 gvs_zlm(y,X,Xint,pl::Array{Int64,1}, iter::Int64, burnin::Int64;thin=1,chain=1,G=6889.) = gvs_zlm(y,X,Xint,pl,  iter, burnin, MersenneTwister(convert(Int, rand([i for i in 1:1e6])));thin=thin,chain=chain,G=G)

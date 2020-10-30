@@ -184,7 +184,7 @@ function gibbs_lassolm(y,X,Xint,iter,burnin,rng; binits=NaN, chain = 1,
     nms = vcat(nms, [Symbol("betau" * "[$i]") for i in 0:p])
   end
   df = convert(DataFrame, rr)
-  rename!(df, nms)
+  names!(df, nms)
   df[(burnin+1):iter,:]
 end
 
