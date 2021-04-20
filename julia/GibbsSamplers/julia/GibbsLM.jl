@@ -298,7 +298,7 @@ function gibbs_lm(y,X,Xint,iter,burnin,rng; chain=1, binits=NaN,
   df = convert(DataFrame, rr)
   #exnm = names(df)
   #renamer = Dict([exnm[i] => nms[i] for i in 1:length(exnm)])
-  names!(df, nms)
+  rename!(df, nms)
   df[(burnin+1):iter,:]
 end
 

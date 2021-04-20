@@ -173,7 +173,7 @@ function gibbs_horselogit(y,X,Xint,iter,burnin,rng; binits=NaN,
   end
   res = convert(DataFrame, hcat([chain for i in 1:iter], [i for i in 1:iter], 
    _py_store, _beta_store, _lamsq_store, _tausq_store))
-  names!(res, vcat(:chain, :iter, :m1, :m0, :md, 
+  rename!(res, vcat(:chain, :iter, :m1, :m0, :md, 
     [Symbol("beta" * "[$i]") for i in 0:p],
     [Symbol("lambdasq" * "[$i]") for i in 1:p],
     :tausq

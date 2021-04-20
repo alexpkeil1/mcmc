@@ -155,7 +155,7 @@ function gibbs_logit(y,X,Xint,iter,burnin,rng; binits=NaN, chain = 1.,
     end
   end
   res = convert(DataFrame, hcat([chain for i in 1:iter], [i for i in 1:iter], _py_store, _beta_store))
-  names!(res, vcat(:chain, :iter, :m1, :m0, :md, [Symbol("beta" * "[$i]") for i in 0:p]))#, [Symbol("rd" * "$i") for i in 1:nints]))
+  rename!(res, vcat(:chain, :iter, :m1, :m0, :md, [Symbol("beta" * "[$i]") for i in 0:p]))#, [Symbol("rd" * "$i") for i in 1:nints]))
   return res[(burnin+1):iter,:]
 end
 
@@ -229,7 +229,7 @@ function gibbs_hlogit(y,X,Xint,iter,burnin,rng; binits=NaN,
    _py_store, _beta_store, _mu_store, _tausq_store)
   nms = vcat(:chain, :iter, :m1, :m0, :md, [Symbol("beta" * "[$i]") for i in 0:p], [Symbol("mu" * "[$i]") for i in 1:j], [Symbol("tausq" * "[$i]") for i in 1:j])
   res = convert(DataFrame, rr)
-  names!(res, nms)#, [Symbol("rd" * "$i") for i in 1:nints]))
+  rename!(res, nms)#, [Symbol("rd" * "$i") for i in 1:nints]))
   return res[(burnin+1):iter,:]
 end
 
@@ -378,7 +378,7 @@ function slice_logit(y,X,Xint,iter,burnin,rng;
   println("Acceptance ratio")
   println(ap/iter)
   res = DataFrame(hcat([chain for i in 1:iter], [i for i in 1:iter], _py_store, _beta_store,__lp))
-  names!(res, vcat(:chain, :iter, :m1, :m0, :md, [Symbol("beta" * "[$i]") for i in 0:p], :__lp))#, [Symbol("rd" * "$i") for i in 1:nints]))
+  rename!(res, vcat(:chain, :iter, :m1, :m0, :md, [Symbol("beta" * "[$i]") for i in 0:p], :__lp))#, [Symbol("rd" * "$i") for i in 1:nints]))
   return res[(burnin+1):iter,:]
 end
 ;
