@@ -295,10 +295,10 @@ function gibbs_lm(y,X,Xint,iter,burnin,rng; chain=1, binits=NaN,
     rr = hcat(rr, _beta_ustd)
     nms = vcat(nms, [Symbol("betau_$i") for i in 0:p])
   end
-  df = convert(DataFrame, rr)
+  df = DataFrame(rr, nms)
   #exnm = names(df)
   #renamer = Dict([exnm[i] => nms[i] for i in 1:length(exnm)])
-  rename!(df, nms)
+  #rename!(df, nms)
   df[(burnin+1):iter,:]
 end
 
@@ -449,10 +449,10 @@ function gibbs_hlm(y,X,Xint,iter,burnin,rng; chain = 1, binits=NaN,
     rr = hcat(rr, _beta_ustd)
     nms = vcat(nms, [Symbol("betau_$i") for i in 0:p])
   end
-  df = convert(DataFrame, rr)
-  exnm = names(df)
-  renamer = Dict([exnm[i] => nms[i] for i in 1:length(exnm)])
-  rename!(df, renamer)
+  df = DataFrame(rr, nms)
+  #exnm = names(df)
+  #renamer = Dict([exnm[i] => nms[i] for i in 1:length(exnm)])
+  #rename!(df, nms)
   df[(burnin+1):iter,:]
 end
 
