@@ -359,8 +359,9 @@ function gvs_logit(y, X, Xint, pl, iter, burnin, rng; thin=1, chain=1,
     rr = hcat(rr, _beta_ustd)
     nms = vcat(nms, [Symbol("b*gu" * "[$i]") for i in 0:p])
   end
-  df = convert(DataFrame, rr)
-  rename!(df, nms)
+  df = DataFrame(rr, nms)
+  #df = convert(DataFrame, rr)
+  #rename!(df, nms)
   df[range(burnin+1, iter, step=thin),:]
 end
 gvs_logit(y,X,Xint,pl, iter, burnin;thin=1,chain=1, offset=0.0) = gvs_logit(y,X,Xint,pl,  iter, burnin, MersenneTwister(convert(Int, rand([i for i in 1:1e6])));thin=thin,chain=chain, offset=offset)
@@ -469,8 +470,9 @@ function gvs_hlogit(y, X, Xint, pl, iter, burnin, rng; thin=1, chain=1,
    rr = hcat(rr, _beta_ustd)
     nms = vcat(nms, [Symbol("b*gu" * "[$i]") for i in 0:p])
   end
-  df = convert(DataFrame, rr)
-  rename!(df, nms)
+  df = DataFrame(rr, nms)
+  #df = convert(DataFrame, rr)
+  #rename!(df, nms)
   df[range(burnin+1, iter, step=thin),:]
 
 end
@@ -555,8 +557,9 @@ function gvs_zlogit(y, X, Xint, pl, iter, burnin, rng; thin=1, chain=1,
     rr = hcat(rr, _beta_ustd)
     nms = vcat(nms, [Symbol("b*gu" * "[$i]") for i in 0:p])
   end
-  df = convert(DataFrame, rr)
-  rename!(df, nms)
+  df = DataFrame(rr, nms)
+  #df = convert(DataFrame, rr)
+  #rename!(df, nms)
   df[range(burnin+1, iter, step=thin),:]
 end
 gvs_zlogit(y,X,Xint,pl, iter, burnin;thin=1,chain=1,G=Float64(size(y,1)), offset=0.0) = gvs_zlogit(y,X,Xint,pl,  iter, burnin, MersenneTwister(convert(Int, rand([i for i in 1:1e6])));thin=thin,chain=chain,G=G, offset=offset)

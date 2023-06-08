@@ -441,8 +441,9 @@ function gvs_lm(y, X, Xint, pl::Array{Int64,1}, iter::Int64, burnin::Int64, rng;
     rr = hcat(rr, _beta_ustd)
     nms = vcat(nms, [Symbol("b*gu" * "[$i]") for i in 0:p])
   end
-  df = convert(DataFrame, rr)
-  rename!(df, nms)
+  df = DataFrame(rr, nms)
+  #df = convert(DataFrame, rr)
+  #rename!(df, nms)
   df[range(burnin+1, iter, step=thin),:]
 end
 gvs_lm(y,X,Xint,pl::Array{Int64,1}, iter::Int64, burnin::Int64;thin=1,chain=1) = gvs_lm(y,X,Xint,pl,  iter, burnin, MersenneTwister(convert(Int, rand([i for i in 1:1e6])));thin=thin,chain=chain)
@@ -565,8 +566,9 @@ function gvs_hlm(y, X, Xint, pl::Array{Int64,1}, iter::Int64, burnin::Int64, rng
    rr = hcat(rr, _beta_ustd)
     nms = vcat(nms, [Symbol("b*gu" * "[$i]") for i in 0:p])
   end
-  df = convert(DataFrame, rr)
-  rename!(df, nms)
+  df = DataFrame(rr, nms)
+  #df = convert(DataFrame, rr)
+  #rename!(df, nms)
   df[range(burnin+1, iter, step=thin),:]
 
 end
@@ -658,8 +660,9 @@ function gvs_zlm(y, X, Xint, pl::Array{Int64,1}, iter::Int64, burnin::Int64, rng
     rr = hcat(rr, _beta_ustd)
     nms = vcat(nms, [Symbol("b*gu" * "[$i]") for i in 0:p])
   end
-  df = convert(DataFrame, rr)
-  rename!(df, nms)
+  df = DataFrame(rr, nms)
+  #df = convert(DataFrame, rr)
+  #rename!(df, nms)
   df[range(burnin+1, iter, step=thin),:]
 end
 gvs_zlm(y,X,Xint,pl::Array{Int64,1}, iter::Int64, burnin::Int64;thin=1,chain=1,G=6889.) = gvs_zlm(y,X,Xint,pl,  iter, burnin, MersenneTwister(convert(Int, rand([i for i in 1:1e6])));thin=thin,chain=chain,G=G)

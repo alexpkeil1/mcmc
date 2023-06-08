@@ -344,8 +344,9 @@ function gibbs_horseshoelm(y,X,Xint,iter,burnin,rng; chain=1,
     rr = hcat(rr, _beta_ustd)
     nms = vcat(nms, [Symbol("betau" * "[$i]") for i in 0:p])
   end
-  df = convert(DataFrame, rr)
-  rename!(df, nms)
+  df = DataFrame(rr, nms)
+  #df = convert(DataFrame, rr)
+  #rename!(df, nms)
   df[(burnin+1):iter,:]
 end
 
