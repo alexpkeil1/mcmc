@@ -183,12 +183,47 @@ extrema(post["labels"], dims=1) # check for label switching
 # mean(post["pi"], dims=1)
 # no need to address label switching
 
-mean(post["pi"], dims=1)
+# re-creating posterior mean table (p(C) and p(Y=1|C))
+tab2 = DataFrame(hcat(vcat(:pi_j,nmnew[2:end]), round.(vcat(mean(post["pi"], dims=1),
+     reshape(mean(post["pjk"], dims=1), (4,6))'), digits=3)), [:_, :c1, :c2, :c3, :c4]);
+
+tab2 |> display
+
+
+
 # stability of classes 
 # pjk describes probability of being in a class, given Y_k; here we estimate that probability given the vector Y
 classmode = [mode(post["class"][:,i]) for i in 1:size(y,1)] # modal class for each id
 classstable = reduce(hcat, [post["class"][iter,:] .== classmode for iter in 1:size(post["class"],1)])
 probclass = mean(classstable, dims=2)[:] # P(C|Y) = pjk[c,k]*pi[c] / (sum(pjk*pi))
+
+
+# checking with posterior sampling functions
+y[1,:]
+classmode[1]
+pc1l = [classvecs_i(4, post["pi"][iter,:], y[1,:], reshape(post["pjk"][iter,:],(4,6))) for iter in 1:size(post["pi"], 1)]
+pc1 = reduce(hcat, pc1l)
+mean(pc1, dims=2)
+probclass[1] 
+
+# least probable classification
+idx = argmin(probclass)
+y[idx,:]
+
+pcminl = [classvecs_i(4, post["pi"][iter,:], y[idx,:], reshape(post["pjk"][iter,:],(4,6))) for iter in 1:size(post["pi"], 1)]
+pcmin = reduce(hcat, pcminl)
+mean(pcmin, dims=2)
+probclass[idx] 
+
+# most probable classification
+idx = argmax(probclass)
+y[idx,:]
+classmode[idx]
+pcminl = [classvecs_i(4, post["pi"][iter,:], y[idx,:], reshape(post["pjk"][iter,:],(4,6))) for iter in 1:size(post["pi"], 1)]
+pcmin = reduce(hcat, pcminl)
+mean(pcmin, dims=2)
+probclass[idx] 
+
 
 
 describe(probclass)
@@ -199,15 +234,34 @@ addhealth[findall(probclass .< 0.5),:]
 
 
 
-# re-creating posterior mean table
-DataFrame(hcat(vcat(:pi_j,nmnew[2:end]), round.(vcat(mean(post["pi"], dims=1),
-     reshape(mean(post["pjk"], dims=1), (4,6))'), digits=3)), [:_, :c1, :c2, :c3, :c4])
 
 # Trace plot example
 using Plots
 plot(post["pi"][100:end,1])
 
 plot(post["pjk"][100:end,7])
+```
+
+```julia
+# now eliminate missing data issues
+nmorig = [:AID,:H1DS3,:H1DS15,:H1DS2,:H1DS4,:H1DS13,:H1DS14]
+nmnew =  [:AID,:lied,:publicly,:damaged,:shoplift,:stole50,:grpfight]
+addhealth = CSV.read(expanduser("~/Documents/DataSets/PublicData/AddHealth/ICPSR_21600/DS0001/21600-0001-Data.tsv"), DataFrame, delim="\t", select=nmorig)[:,nmorig]
+rename!(addhealth, nmnew)
+
+elim  = maximum(Matrix(Int.(addhealth[:,2:end] .> 3)), dims=2)[:]
+y = Matrix(Int.(addhealth[:,2:end] .> 0))
+y2 = y[findall(elim .== 0),:]
+
+post = gibbs_lca(y2,4;iters=12000, burnin=2500)
+
+
+tab2b = DataFrame(hcat(vcat(:pi_j,nmnew[2:end]), round.(vcat(mean(post["pi"], dims=1),
+     reshape(mean(post["pjk"], dims=1), (4,6))'), digits=3)), [:_, :c1, :c2, :c3, :c4]);
+
+tab2b |> display
+
+corspearman(y2)
 ```
 """
 function gibbs_lca(rng, y,K;
