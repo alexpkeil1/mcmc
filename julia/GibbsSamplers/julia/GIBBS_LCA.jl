@@ -28,7 +28,7 @@ sample_pi!(pi, classvecs, u)
 """
 function sample_pi!(pi, classvecs, u)
     #pli = [classvecs[i,:] for i in 1:size(classvecs,1)]
-    pl = sum(classvecs, dims=1)[:] + u
+    pl = sum(classvecs, dims = 1)[:] + u
     pi .= rand(Dirichlet(pl))
     nothing
 end
@@ -63,10 +63,10 @@ pjk
 ```
 """
 function sample_pjk!(rng, pjk, K, y, classvecs, ajk, bjk)
-    for c in 1:K
-        a = classvecs[:,c:c]'*y .+ ajk[c:c,:]# .- 1
-        b = classvecs[:,c:c]'*(1.0 .- y) .+ bjk[c:c,:]# .- 1
-        pjk[c,:] .= rand.(rng, Beta.(a[:],b[:]))
+    for c = 1:K
+        a = classvecs[:, c:c]' * y .+ ajk[c:c, :]# .- 1
+        b = classvecs[:, c:c]' * (1.0 .- y) .+ bjk[c:c, :]# .- 1
+        pjk[c, :] .= rand.(rng, Beta.(a[:], b[:]))
     end
     nothing
 end
@@ -77,9 +77,9 @@ sample_pjk!(pjk, J, y, classvecs, ajk, bjk) = sample_pjk!(MersenneTwister(), pjk
 function classvecs_i(K, pi_, yi, pjk)
     # p(c|y) = p(c) * p(y|c) / p(y)
     cv = zeros(K)
-    for c in 1:K
-      lpj = yi .* log.(pjk[c,:]) .+  (1.0 .- yi) .* log.(1.0 .- pjk[c,:])
-      cv[c] += exp(log(pi_[c])+sum(lpj)) # cv[j] = p(j) * p(y|j)
+    for c = 1:K
+        lpj = yi .* log.(pjk[c, :]) .+ (1.0 .- yi) .* log.(1.0 .- pjk[c, :])
+        cv[c] += exp(log(pi_[c]) + sum(lpj)) # cv[j] = p(j) * p(y|j)
     end
     # pi_' * pjk
     cv ./ sum(cv)
@@ -105,8 +105,8 @@ classvecs_i(C, pi_, y[1,:], pjk)
 """
 function sample_classvecs!(rng, classvecs, pi_, y, pjk, K)
     # future: optionally output the probabilities
-    for i in 1:size(y,1)
-        classvecs[i,:] .= rand(rng, Multinomial(1, classvecs_i(K, pi_, y[i,:], pjk)))
+    for i = 1:size(y, 1)
+        classvecs[i, :] .= rand(rng, Multinomial(1, classvecs_i(K, pi_, y[i, :], pjk)))
     end
     nothing
 end
@@ -114,7 +114,7 @@ sample_classvecs!(classvecs, pi, y, pjk, K) = sample_classvecs!(MersenneTwister(
 
 function labswitch_classmove(cvi, cvcur, perms)
     matchmat = cvi' * cvcur #.= classvecs[:,sp]
-    whichp = argmax([sum(diag(matchmat[:,p])) for p in perms])
+    whichp = argmax([sum(diag(matchmat[:, p])) for p in perms])
     perms[whichp]
 end
 
@@ -133,11 +133,11 @@ mean(parm, dims=1)
 ```
 """
 function relabelpost!(parm, labs)
-  for row in 1:size(parm,1)
-    tmp = parm[row,labs[row,:]]
-    parm[row,:] .= tmp
-  end
-  nothing
+    for row = 1:size(parm, 1)
+        tmp = parm[row, labs[row, :]]
+        parm[row, :] .= tmp
+    end
+    nothing
 end
 
 
@@ -264,62 +264,61 @@ tab2b |> display
 corspearman(y2)
 ```
 """
-function gibbs_lca(rng, y,K;
+function gibbs_lca(
+    rng,
+    y,
+    K;
     # MCMC parameters
-    iters=100, burnin=0, 
+    iters = 100,
+    burnin = 0,
     # priors
     u = ones(K),     # Dirichlet concentration parameters for pi
-    ajk = ones(K,size(y,2)), # beta priors for pjk (parameter 1)
-    bjk = ones(K,size(y,2))  # beta priors for pjk (parameter 2)
-    )
+    ajk = ones(K, size(y, 2)), # beta priors for pjk (parameter 1)
+    bjk = ones(K, size(y, 2)),  # beta priors for pjk (parameter 2)
+)
     # pre-reqs
-    N,Q = size(y)
+    N, Q = size(y)
     perms = [p for p in permutations(collect(1:K))] # label switching
     nperms = factorial(K)
     # initialize parameters
     classlabs = sample(rng, 1:K, N)
-    classvecs = zeros(Int64,N,K)
-    classvecs_init = zeros(Int64,N,K)
-    for i in 1:N
-      classvecs[i,classlabs[i]] = 1
+    classvecs = zeros(Int64, N, K)
+    classvecs_init = zeros(Int64, N, K)
+    for i = 1:N
+        classvecs[i, classlabs[i]] = 1
     end
     pi_ = rand(rng, K)
-    pjk = rand(rng, K,Q)
+    pjk = rand(rng, K, Q)
     # storage containers across the chain
-    pi_post = Array{Float64,2}(undef, iters-burnin, K)
-    pjk_post = Array{Float64,2}(undef, iters-burnin, K*Q)
-    class_post = Array{Float64,2}(undef, iters-burnin, N)
-    reord_post = Array{Int64,2}(undef, iters-burnin, K)
+    pi_post = Array{Float64,2}(undef, iters - burnin, K)
+    pjk_post = Array{Float64,2}(undef, iters - burnin, K * Q)
+    class_post = Array{Float64,2}(undef, iters - burnin, N)
+    reord_post = Array{Int64,2}(undef, iters - burnin, K)
     if burnin == 0
-      pi_post[1,:] = pi_
-      pjk_post[1,:] = pjk[:] # down in columns: p[1,1], p[2,1], ... etc.
-      class_post[1,:] = [c[2] for c in argmax(classvecs, dims=2)] # down in columns: classvec[1,1], classvec[2,1], ... etc.
+        pi_post[1, :] = pi_
+        pjk_post[1, :] = pjk[:] # down in columns: p[1,1], p[2,1], ... etc.
+        class_post[1, :] = [c[2] for c in argmax(classvecs, dims = 2)] # down in columns: classvec[1,1], classvec[2,1], ... etc.
     end
     # iterate
-    for sweep in 2:iters
+    for sweep = 2:iters
         # sampling parameters
         sample_classvecs!(MersenneTwister(), classvecs, pi_, y, pjk, K)
         sample_pi!(pi_, classvecs, u)
         sample_pjk!(MersenneTwister(), pjk, K, y, classvecs, ajk, bjk)
         # end sampling parameters
-        if (sweep == 2 && burnin==0) || (sweep == burnin)
+        if (sweep == 2 && burnin == 0) || (sweep == burnin)
             classvecs_init .= deepcopy(classvecs)
         end
         if sweep > burnin
-          # label switching (which permutation of the confusion matrix columns gives the largest diagonal?)
-          ord = labswitch_classmove(classvecs_init, classvecs, perms)
-          pi_post[sweep-burnin,:] .= pi_
-          pjk_post[sweep-burnin,:] .= pjk[:] # down in columns: p[1,1], p[2,1], ... etc.
-          class_post[sweep-burnin,:] .= [c[2] for c in argmax(classvecs, dims=2)] # down in columns: classvec[1,1], classvec[2,1], ... etc.    
-          reord_post[sweep-burnin,:] .= ord # down in columns: classvec[1,1], classvec[2,1], ... etc.    
+            # label switching (which permutation of the confusion matrix columns gives the largest diagonal?)
+            ord = labswitch_classmove(classvecs_init, classvecs, perms)
+            pi_post[sweep-burnin, :] .= pi_
+            pjk_post[sweep-burnin, :] .= pjk[:] # down in columns: p[1,1], p[2,1], ... etc.
+            class_post[sweep-burnin, :] .= [c[2] for c in argmax(classvecs, dims = 2)] # down in columns: classvec[1,1], classvec[2,1], ... etc.    
+            reord_post[sweep-burnin, :] .= ord # down in columns: classvec[1,1], classvec[2,1], ... etc.    
         end
     end
-    Dict(
-        "pi" => pi_post, 
-        "pjk" => pjk_post, 
-        "class" => class_post,
-        "labels" => reord_post
-    )
+    Dict("pi" => pi_post, "pjk" => pjk_post, "class" => class_post, "labels" => reord_post)
 end
-gibbs_lca(y,K;kwargs...) = gibbs_lca(MersenneTwister(), y,K;kwargs...)
+gibbs_lca(y, K; kwargs...) = gibbs_lca(MersenneTwister(), y, K; kwargs...)
 

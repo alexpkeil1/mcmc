@@ -152,204 +152,297 @@ using Distributions, DataFrames, GLM, StatsBase, LinearAlgebra
 
 
 function initialize!(_beta, binits, p)
-  if isnan(binits[1])
-    _beta .= randn(p)*2
-  else
-    _beta .= copy(binits)
-  end
+    if isnan(binits[1])
+        _beta .= randn(p) * 2
+    else
+        _beta .= copy(binits)
+    end
 end
 
-function inits(y,X,Xint,iter,_mu_eta0,_tau_eta0,_mu_beta0,_tau_beta0, _sigmaa0,binits)
-  # constants
-  (N,p) = size(X)
-  Nf = Float64(N)
-  Ni = size(Xint[1], 1)
-  a = _sigmaa0 + Nf/2.
-  X = hcat(ones(N), X)
-  _beta = Array{Float64,1}(undef, p+1)
-  initialize!(_beta, binits, p+1)
-  mu = X * _beta
-  Xint = Xint
-  Xt = transpose(X)
-  xtx = Xt * X
-  xty = Xt * y
-  _A::Symmetric{Float64, Array{Float64, 2}} = Symmetric(Array{Float64}(undef, p+1, p+1))
-  _A_ms = Array{Float64,1}(undef, p+1)
-  _iLams = vcat(_tau_eta0^(-2), [_tau_beta0^(-2) for j in 1:p]) # precision prior on beta coefficients
-  _muvec = vcat(_mu_eta0, [_mu_beta0 for j in 1:p])      # mean prior on beta coefficients
-  munc, muint = Array{Float64,1}(undef, Ni), Array{Float64,1}(undef, Ni)
-  #z = kappa ./ om
-  _beta_store = Array{Float64,2}(undef, iter, p+1)
-  _py_store = zeros(iter, 3)
-  _sig_store= Array{Float64,1}(undef, iter)
-  return(
-    N, Nf, p, _beta, mu,
-    X, Xint, Xt, xtx, xty,
-    _A, _A_ms, _iLams, _muvec, a, 
-    munc, muint,
-    _beta_store, _py_store, _sig_store
-  )
+function inits(y, X, Xint, iter, _mu_eta0, _tau_eta0, _mu_beta0, _tau_beta0, _sigmaa0, binits)
+    # constants
+    (N, p) = size(X)
+    Nf = Float64(N)
+    Ni = size(Xint[1], 1)
+    a = _sigmaa0 + Nf / 2.0
+    X = hcat(ones(N), X)
+    _beta = Array{Float64,1}(undef, p + 1)
+    initialize!(_beta, binits, p + 1)
+    mu = X * _beta
+    Xint = Xint
+    Xt = transpose(X)
+    xtx = Xt * X
+    xty = Xt * y
+    _A::Symmetric{Float64,Array{Float64,2}} = Symmetric(Array{Float64}(undef, p + 1, p + 1))
+    _A_ms = Array{Float64,1}(undef, p + 1)
+    _iLams = vcat(_tau_eta0^(-2), [_tau_beta0^(-2) for j = 1:p]) # precision prior on beta coefficients
+    _muvec = vcat(_mu_eta0, [_mu_beta0 for j = 1:p])      # mean prior on beta coefficients
+    munc, muint = Array{Float64,1}(undef, Ni), Array{Float64,1}(undef, Ni)
+    #z = kappa ./ om
+    _beta_store = Array{Float64,2}(undef, iter, p + 1)
+    _py_store = zeros(iter, 3)
+    _sig_store = Array{Float64,1}(undef, iter)
+    return (
+        N,
+        Nf,
+        p,
+        _beta,
+        mu,
+        X,
+        Xint,
+        Xt,
+        xtx,
+        xty,
+        _A,
+        _A_ms,
+        _iLams,
+        _muvec,
+        a,
+        munc,
+        muint,
+        _beta_store,
+        _py_store,
+        _sig_store,
+    )
 end
 
-inits(y,X,Xint,iter,_mu_eta0,_tau_eta0,_mu_beta0,_tau_beta0) = inits(y,X,Xint,iter,_mu_eta0,_tau_eta0,_mu_beta0,_tau_beta0, NaN)
-inits(y,X,Xint,iter) = inits(y,X,Xint,iter,0.0,Inf,0.0,Inf, NaN)
+inits(y, X, Xint, iter, _mu_eta0, _tau_eta0, _mu_beta0, _tau_beta0) =
+    inits(y, X, Xint, iter, _mu_eta0, _tau_eta0, _mu_beta0, _tau_beta0, NaN)
+inits(y, X, Xint, iter) = inits(y, X, Xint, iter, 0.0, Inf, 0.0, Inf, NaN)
 
 function updatenu!(_nu, _lamsq, p)
-  # local shrinkage latent variable (p length)
-  na = 1.0
-  nb = 1.0 .+ inv.(_lamsq)
-  _nu .= rand.(rng, InverseGamma.(na,nb))
+    # local shrinkage latent variable (p length)
+    na = 1.0
+    nb = 1.0 .+ inv.(_lamsq)
+    _nu .= rand.(rng, InverseGamma.(na, nb))
 end
 
 function updatelamsq!(_lamsq, _tausq, _invsigma2, _nu, _beta, p)
-  # local shrinkage parameter (p length)
-  la = 1.0
-  lb = inv.(_nu) 
-  lb .+= _beta .^2.0 .* _invsigma2 ./ (2.0 .* _tausq )
-  _lamsq .= rand.(rng, InverseGamma.(la,lb))
+    # local shrinkage parameter (p length)
+    la = 1.0
+    lb = inv.(_nu)
+    lb .+= _beta .^ 2.0 .* _invsigma2 ./ (2.0 .* _tausq)
+    _lamsq .= rand.(rng, InverseGamma.(la, lb))
 end
 
 function samplezeta(_tausq)
-  # global shrinkage latent variable
-  za = 1.0
-  zb = 1.0 + inv(_tausq)
-  rand(rng, InverseGamma( za, zb ))
+    # global shrinkage latent variable
+    za = 1.0
+    zb = 1.0 + inv(_tausq)
+    rand(rng, InverseGamma(za, zb))
 end
 
 function sampletausq(_invsigma2, _lamsq, _zeta, _beta, p)
-  # global shrinkage parameter
-  ta = ( p + 1.0 ) / 2.0
-  tb = inv(_zeta) 
-  tb += 0.5 * _invsigma2  * sum(_beta .^2.0 ./ _lamsq )
-  rand(rng, InverseGamma(ta, tb))
+    # global shrinkage parameter
+    ta = (p + 1.0) / 2.0
+    tb = inv(_zeta)
+    tb += 0.5 * _invsigma2 * sum(_beta .^ 2.0 ./ _lamsq)
+    rand(rng, InverseGamma(ta, tb))
 end
 
 function updateiLams!(_iLams, _tausq, _lamsq)
-  _iLams[2:end] .= inv.(_tausq .* _lamsq)
+    _iLams[2:end] .= inv.(_tausq .* _lamsq)
 end
 
 function sampleinvsigma2(rng, a, _sigmab0, res, y, X, _beta)
-  # sample precision from a gamma prior
-  res .= y .- X * _beta 
-  se = transpose(res) * res #  permutedims(y .- X * _beta) * (y .- X * _beta)
-  #a = _sigmaa0 + Nf/2.
-  b = _sigmab0 + se/2.
-  #sigma2 = rand(rng, InverseGamma(a, b))
-  rand(rng, Gamma(a, 1. / b))
+    # sample precision from a gamma prior
+    res .= y .- X * _beta
+    se = transpose(res) * res #  permutedims(y .- X * _beta) * (y .- X * _beta)
+    #a = _sigmaa0 + Nf/2.
+    b = _sigmab0 + se / 2.0
+    #sigma2 = rand(rng, InverseGamma(a, b))
+    rand(rng, Gamma(a, 1.0 / b))
 end
 
 
 function sampleinvsigma2(rng, _sigmab0, res, y, X, _beta, nu, _invsigma2, Nf)
-  # sample precision from a half cauchy prior (via representation as a scale mixture of gammas)
-  va = 0.5 + nu/2.0
-  vb = nu * _invsigma2 + _sigmab0^(-2) # _sigmab0 = A
-  V = rand(rng, InverseGamma( va, vb))
-  res .= y .- X * _beta 
-  se = transpose(res) * res #  permutedims(y .- X * _beta) * (y .- X * _beta)
-  #
-  sa = (Nf + nu)/2.0
-  sb = nu/V + se/2.
-  rand(rng, Gamma(sa, 1. / sb))
+    # sample precision from a half cauchy prior (via representation as a scale mixture of gammas)
+    va = 0.5 + nu / 2.0
+    vb = nu * _invsigma2 + _sigmab0^(-2) # _sigmab0 = A
+    V = rand(rng, InverseGamma(va, vb))
+    res .= y .- X * _beta
+    se = transpose(res) * res #  permutedims(y .- X * _beta) * (y .- X * _beta)
+    #
+    sa = (Nf + nu) / 2.0
+    sb = nu / V + se / 2.0
+    rand(rng, Gamma(sa, 1.0 / sb))
 end
 
 
 function updatebeta!(rng, _beta, xtx, xty, _iLams, _muvec, _A, _A_ms)
-   # block sampler for beta coefficients
-   _A.data .= xtx + Diagonal(_iLams)
-   _A_ms .= xty .+ _iLams .* _muvec   # for vector of precisions (iLams is diagonal of precision matrix)
-  _beta .= rand(rng, MvNormalCanon(_A_ms, _A))
+    # block sampler for beta coefficients
+    _A.data .= xtx + Diagonal(_iLams)
+    _A_ms .= xty .+ _iLams .* _muvec   # for vector of precisions (iLams is diagonal of precision matrix)
+    _beta .= rand(rng, MvNormalCanon(_A_ms, _A))
 end
 
 function calcmd!(munc, muint, ymean, yscale, Xint, _beta)
-  mul!(munc, Xint[1], _beta[2:end])
-  mul!(muint, Xint[2], _beta[2:end])
-  cm1 = ymean + yscale*(_beta[1] + mean(munc))
-  cm0 = ymean + yscale*(_beta[1] + mean(muint))
-  md = cm1-cm0
-  cm1, cm0, md
+    mul!(munc, Xint[1], _beta[2:end])
+    mul!(muint, Xint[2], _beta[2:end])
+    cm1 = ymean + yscale * (_beta[1] + mean(munc))
+    cm0 = ymean + yscale * (_beta[1] + mean(muint))
+    md = cm1 - cm0
+    cm1, cm0, md
 end
 
-function gibbs_horseshoelm(y,X,Xint,iter,burnin,rng; chain=1,
-               binits=NaN,
-                ymean = 0.0, # rescaling coefficients
-                yscale = 1.0, # rescaling coefficients
-               offset = 0.0,
-               _mu_eta0 = 0., _tau_eta0 = 1000.,                              # prior mean, sd of intercept
-               _mu_beta0 = 0., _tau_beta0 = 100.0,                                # prior mean, sd (ignored) of beta
-               _sigmaa0 = 0.0, _sigmab0 = 0.0
+function gibbs_horseshoelm(
+    y,
+    X,
+    Xint,
+    iter,
+    burnin,
+    rng;
+    chain = 1,
+    binits = NaN,
+    ymean = 0.0, # rescaling coefficients
+    yscale = 1.0, # rescaling coefficients
+    offset = 0.0,
+    _mu_eta0 = 0.0,
+    _tau_eta0 = 1000.0,                              # prior mean, sd of intercept
+    _mu_beta0 = 0.0,
+    _tau_beta0 = 100.0,                                # prior mean, sd (ignored) of beta
+    _sigmaa0 = 0.0,
+    _sigmab0 = 0.0,
 )
-  (
-    N, Nf, p, _beta, mu,
-    X, Xint, Xt, xtx, xty,
-    _A, _A_ms, _iLams, _muvec, a, 
-    munc, muint,
-    _beta_store, _py_store, _sig_store
-  ) = inits(y,X,Xint,iter,_mu_eta0,_tau_eta0,_mu_beta0,_tau_beta0, _sigmaa0,binits)
-  #
-  res = zeros(N)
-  _nu = rand(rng, p)
-  _invsigma2 = rand(rng)
-  _lamsq = rand(rng, p)*2.0
-  _zeta = rand(rng)
-  _tausq = rand(rng)*2.0
-  _tausq_store = Array{Float64, 1}(undef, iter)
-  _lamsq_store = Array{Float64, 2}(undef, iter, p)
-  for i in 1:iter
-    # sample
-    ##############################
-    # update global shrinkage
-    ##############################
-    updatenu!(_nu, _lamsq, p)
-    updatelamsq!(_lamsq, _tausq, _invsigma2, _nu, _beta[2:end], p)
-    ##############################
-    # update local shrinkage
-    ##############################
-    _zeta = samplezeta(_tausq)
-    _tausq = sampletausq(_invsigma2, _lamsq, _zeta, _beta[2:end], p)
-    updateiLams!(_iLams, _tausq, _lamsq)
-    ##############################
-    # update model parameters
-    ##############################
-    updatebeta!(rng, _beta, xtx, xty, _iLams, _muvec, _A, _A_ms)
-    ############
-    # sample sigma from InverseGamma
-    ############
-    _invsigma2 = sampleinvsigma2(rng, a, _sigmab0, res, y, X, _beta) # inverse gamma
-    #_invsigma2 = sampleinvsigma2(rng, _sigmab0, res, y, X, _beta, 1.0, _invsigma2, Nf) # half-cauchy
-    if i > burnin  
-      ##############################
-      # update summary parameters
-      ##############################
-      cm1, cm0, md = calcmd!(munc, muint, ymean, yscale, Xint, _beta)
-      ##############################
-      # storage
-      ##############################
-      _sig_store[i] = _invsigma2
-      _tausq_store[i] = _tausq
-      _lamsq_store[i,:] = _lamsq
-      _beta_store[i,:] = _beta
-      _py_store[i,:] = vcat(cm1, cm0, md)
+    (
+        N,
+        Nf,
+        p,
+        _beta,
+        mu,
+        X,
+        Xint,
+        Xt,
+        xtx,
+        xty,
+        _A,
+        _A_ms,
+        _iLams,
+        _muvec,
+        a,
+        munc,
+        muint,
+        _beta_store,
+        _py_store,
+        _sig_store,
+    ) = inits(y, X, Xint, iter, _mu_eta0, _tau_eta0, _mu_beta0, _tau_beta0, _sigmaa0, binits)
+    #
+    res = zeros(N)
+    _nu = rand(rng, p)
+    _invsigma2 = rand(rng)
+    _lamsq = rand(rng, p) * 2.0
+    _zeta = rand(rng)
+    _tausq = rand(rng) * 2.0
+    _tausq_store = Array{Float64,1}(undef, iter)
+    _lamsq_store = Array{Float64,2}(undef, iter, p)
+    for i = 1:iter
+        # sample
+        ##############################
+        # update global shrinkage
+        ##############################
+        updatenu!(_nu, _lamsq, p)
+        updatelamsq!(_lamsq, _tausq, _invsigma2, _nu, _beta[2:end], p)
+        ##############################
+        # update local shrinkage
+        ##############################
+        _zeta = samplezeta(_tausq)
+        _tausq = sampletausq(_invsigma2, _lamsq, _zeta, _beta[2:end], p)
+        updateiLams!(_iLams, _tausq, _lamsq)
+        ##############################
+        # update model parameters
+        ##############################
+        updatebeta!(rng, _beta, xtx, xty, _iLams, _muvec, _A, _A_ms)
+        ############
+        # sample sigma from InverseGamma
+        ############
+        _invsigma2 = sampleinvsigma2(rng, a, _sigmab0, res, y, X, _beta) # inverse gamma
+        #_invsigma2 = sampleinvsigma2(rng, _sigmab0, res, y, X, _beta, 1.0, _invsigma2, Nf) # half-cauchy
+        if i > burnin
+            ##############################
+            # update summary parameters
+            ##############################
+            cm1, cm0, md = calcmd!(munc, muint, ymean, yscale, Xint, _beta)
+            ##############################
+            # storage
+            ##############################
+            _sig_store[i] = _invsigma2
+            _tausq_store[i] = _tausq
+            _lamsq_store[i, :] = _lamsq
+            _beta_store[i, :] = _beta
+            _py_store[i, :] = vcat(cm1, cm0, md)
+        end
     end
-  end
-  # transform and clean output
-  _sig_store = inv.(sqrt.(_sig_store))
-  rr = hcat([chain for i in 1:iter], [i for i in 1:iter], _py_store, _beta_store, _lamsq_store, _tausq_store, _sig_store)
-  nms = vcat(:chain, :iter, :m1, :m0, :md, 
-    [Symbol("beta" * "[$i]") for i in 0:p],
-    [Symbol("lambdasq" * "[$i]") for i in 1:p],
-                  :tausq, :sigma)
-  if !isapprox(yscale, 1.0)
-    _beta_ustd = _beta_store .* yscale
-    _beta_ustd[:,1] .+= ymean
-    rr = hcat(rr, _beta_ustd)
-    nms = vcat(nms, [Symbol("betau" * "[$i]") for i in 0:p])
-  end
-  df = DataFrame(rr, nms)
-  #df = convert(DataFrame, rr)
-  #rename!(df, nms)
-  df[(burnin+1):iter,:]
+    # transform and clean output
+    _sig_store = inv.(sqrt.(_sig_store))
+    rr = hcat(
+        [chain for i = 1:iter],
+        [i for i = 1:iter],
+        _py_store,
+        _beta_store,
+        _lamsq_store,
+        _tausq_store,
+        _sig_store,
+    )
+    nms = vcat(
+        :chain,
+        :iter,
+        :m1,
+        :m0,
+        :md,
+        [Symbol("beta" * "[$i]") for i = 0:p],
+        [Symbol("lambdasq" * "[$i]") for i = 1:p],
+        :tausq,
+        :sigma,
+    )
+    if !isapprox(yscale, 1.0)
+        _beta_ustd = _beta_store .* yscale
+        _beta_ustd[:, 1] .+= ymean
+        rr = hcat(rr, _beta_ustd)
+        nms = vcat(nms, [Symbol("betau" * "[$i]") for i = 0:p])
+    end
+    df = DataFrame(rr, nms)
+    #df = convert(DataFrame, rr)
+    #rename!(df, nms)
+    df[(burnin+1):iter, :]
 end
 
-gibbs_horseshoelm(y,X,Xint, iter, burnin;offset = 0.0, binits=NaN,thin=1,chain=1,ymean = 0.0, yscale=1.0) = gibbs_horseshoelm(y,X,Xint, iter, burnin, MersenneTwister(convert(Int, rand([i for i in 1:1e6])));offset = offset, binits=binits, thin=thin,chain=chain, ymean = ymean, yscale=yscale)
-gibbs_horseshoelm(y,X,Xint, iter;offset = 0.0, binits=NaN,thin=1,chain=1,ymean = 0.0, yscale=1.0) = gibbs_horseshoelm(y,X,Xint, iter, 0;offset = offset, binits=binits,thin=thin,chain=chain, ymean = ymean, yscale=yscale)
-;
+gibbs_horseshoelm(
+    y,
+    X,
+    Xint,
+    iter,
+    burnin;
+    offset = 0.0,
+    binits = NaN,
+    thin = 1,
+    chain = 1,
+    ymean = 0.0,
+    yscale = 1.0,
+) = gibbs_horseshoelm(
+    y,
+    X,
+    Xint,
+    iter,
+    burnin,
+    MersenneTwister(convert(Int, rand([i for i = 1:1e6])));
+    offset = offset,
+    binits = binits,
+    thin = thin,
+    chain = chain,
+    ymean = ymean,
+    yscale = yscale,
+)
+gibbs_horseshoelm(y, X, Xint, iter; offset = 0.0, binits = NaN, thin = 1, chain = 1, ymean = 0.0, yscale = 1.0) =
+    gibbs_horseshoelm(
+        y,
+        X,
+        Xint,
+        iter,
+        0;
+        offset = offset,
+        binits = binits,
+        thin = thin,
+        chain = chain,
+        ymean = ymean,
+        yscale = yscale,
+    );
