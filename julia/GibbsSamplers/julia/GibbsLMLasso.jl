@@ -94,7 +94,8 @@ function sampleinvsigma2(rng, _sigmab0, res, y, X, _beta, nu, _invsigma2, Nf)
     #
     sa = (Nf + nu) / 2.0
     sb = nu / V + se / 2.0
-    rand(rng, Gamma(sa, 1.0 / sb))
+    #rand(rng, Gamma(sa, 1.0 / sb))
+    inv(rand(rng, Gamma(sa, 1.0 / sb))^2) # half-cauchy is on the scale parameter
 end
 
 function updatetausq!(rng, _lambdasq, _invsigma2, _invtausq, _iLams, _beta)

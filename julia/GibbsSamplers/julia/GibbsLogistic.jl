@@ -4,7 +4,6 @@
 
 using LinearAlgebra, Distributions, DataFrames, StatsBase
 using PolyaGammaDistribution
-import wellwisejl.summarygibbs, wellwisejl.expit
 
 # data
 function expiti(mu::T) where {T}
@@ -218,6 +217,7 @@ function updatemu!(rng, _mu, _muvec, _beta, j, pl, plidx, _tausq, _mu_tau0, _mu_
 end
 
 function updatetausq!(rng, _tausq, _iLams, _beta, j, pl, plidx, _mu, _tau_mu0, _tau_tau0)
+    ## gamma prior
     @inbounds for q = 1:j # loop over hierarchical groups
         bl = _beta[plidx[q]]
         bres = bl .- _mu[q]

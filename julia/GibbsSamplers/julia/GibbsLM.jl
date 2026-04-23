@@ -265,12 +265,12 @@ function sampleinvsigma2(rng, _sigmab0, res, y, X, _beta, nu, _invsigma2, Nf)
     va = 0.5 + nu / 2.0
     vb = nu * _invsigma2 + _sigmab0^(-2) # _sigmab0 = A
     V = rand(rng, InverseGamma(va, vb))
+    #
     res .= y .- X * _beta
     se = transpose(res) * res #  permutedims(y .- X * _beta) * (y .- X * _beta)
-    #
     sa = (Nf + nu) / 2.0
     sb = nu / V + se / 2.0
-    rand(rng, Gamma(sa, 1.0 / sb))
+    inv(rand(rng, InverseGamma(sa, sb))) # sqrt(s2) = half-cauchy; is on the variance parameter
 end
 
 function calcmd!(munc, muint, ymean, yscale, Xint, _beta)

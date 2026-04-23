@@ -150,7 +150,8 @@ function sampleinvsigma2(rng, _sigmab0, res, y, X, _bg, nu, _invsigma2, Nf)
     #
     sa = (Nf + nu) / 2.0
     sb = nu / V + se / 2.0
-    _invsigma2 = rand(rng, Gamma(sa, 1.0 / sb))
+    #_invsigma2 = rand(rng, Gamma(sa, 1.0 / sb))
+    _invsigma2 = inv(rand(rng, Gamma(sa, 1.0 / sb))^2) # half-cauchy is on the scale parameter
 end
 
 function sampleinvsigma2_or(rng, a, _sigmab0, res, y, X, _bg; K = 3, _invsigma2 = _invsigma2)
